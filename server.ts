@@ -2,9 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import cors from "cors";
-import admin from "firebase-admin";
-import { getFirestore, WriteBatch, FieldValue } from "firebase-admin/firestore";
-import fs from "fs";
+import Database from "better-sqlite3";
 
 async function startServer() {
   const app = express();
@@ -13,40 +11,124 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: "50mb" }));
 
-  // Load firebase configuration from applet config
-  let firebaseConfig: any = {};
+  // Initialize SQLite Database
+  let db: any;
   try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    db = new Database('./database.sqlite');
+    console.log('Connected to the SQLite database.');
+    
+    // 1. Products Table
+    db.exec(`CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku TEXT UNIQUE,
+      barcode TEXT UNIQUE,
+      name TEXT,
+      name_ar TEXT,
+      brand TEXT,
+      category TEXT,
+      subcategory TEXT,
+      unit TEXT,
+      selling_price REAL,
+      cost_price REAL,
+      vat REAL,
+      supplier TEXT,
+      stock_quantity INTEGER,
+      description TEXT,
+      status TEXT
+    )`);
+
+    // 2. Customers Table
+    db.exec(`CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE,
+      name_ar TEXT,
+      phone TEXT,
+      email TEXT,
+      trn TEXT,
+      address TEXT,
+      balance REAL DEFAULT 0.0
+    )`);
+
+    // 3. Suppliers Table
+    db.exec(`CREATE TABLE IF NOT EXISTS suppliers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE,
+      name_ar TEXT,
+      contact_person TEXT,
+      phone TEXT,
+      email TEXT,
+      trn TEXT,
+      address TEXT,
+      balance REAL DEFAULT 0.0
+    )`);
+
+    // 4. Invoices Table
+    db.exec(`CREATE TABLE IF NOT EXISTS invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_number TEXT UNIQUE,
+      customer_id INTEGER,
+      customer_name TEXT,
+      customer_trn TEXT,
+      date TEXT,
+      subtotal REAL,
+      discount REAL,
+      vat_amount REAL,
+      grand_total REAL,
+      payment_status TEXT,
+      payment_method TEXT,
+      notes TEXT
+    )`);
+
+    // 5. Invoice Items Table
+    db.exec(`CREATE TABLE IF NOT EXISTS invoice_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER,
+      product_id INTEGER,
+      product_name TEXT,
+      sku TEXT,
+      barcode TEXT,
+      quantity INTEGER,
+      unit_price REAL,
+      vat_rate REAL,
+      vat_amount REAL,
+      total_amount REAL
+    )`);
+
+    // Seed default customers if empty
+    const customerCount = db.prepare("SELECT count(*) as count FROM customers").get() as any;
+    if (customerCount.count === 0) {
+      db.prepare(`INSERT INTO customers (name, name_ar, phone, email, trn, address, balance) VALUES 
+        ('Cash Customer', 'عميل نقدي', '0501234567', 'cash@alrehab.com', '', 'Deira, Dubai, UAE', 0.0),
+        ('Al Sahel Contracting LLC', 'شركة الساحل للمقاولات ذ.م.م', '042233445', 'info@alsahel.ae', '100234567800003', 'Al Quoz, Dubai, UAE', 5420.50),
+        ('Emirates Heights Builders', 'بناة مرتفعات الإمارات', '0569876543', 'contact@ehbuilders.ae', '100456789100003', 'Sharjah, UAE', 0.0)
+      `).run();
     }
-  } catch (err) {
-    console.error("Failed to load firebase-applet-config.json:", err);
+
+    // Seed default suppliers if empty
+    const supplierCount = db.prepare("SELECT count(*) as count FROM suppliers").get() as any;
+    if (supplierCount.count === 0) {
+      db.prepare(`INSERT INTO suppliers (name, name_ar, contact_person, phone, email, trn, address, balance) VALUES 
+        ('Steel & Rebar Gulf Corp', 'مؤسسة الخليج للحديد والصلب', 'Mr. Robert Chen', '0528889991', 'sales@gulfsteel.com', '100999888700003', 'Jebel Ali Free Zone, Dubai', -12500.00),
+        ('Universal Cement Factory', 'مصنع الاسمنت العالمي', 'Ahmad Al Mansoori', '037776665', 'orders@unicement.ae', '100345112200003', 'Al Ain, UAE', 0.0),
+        ('National Pipes & Fittings', 'الوطنية للأنابيب والتجهيزات', 'Sanjay Kumar', '065554433', 'sanjay@nationalpipes.com', '100888111200003', 'Industrial Area 5, Sharjah', -4350.00)
+      `).run();
+    }
+
+  } catch (err: any) {
+    console.error('Error opening database', err.message);
   }
 
-  // Initialize Firebase Admin SDK
-  if (firebaseConfig.projectId) {
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId
-    });
-    console.log(`Firebase Admin initialized with project: ${firebaseConfig.projectId}`);
-  } else {
-    admin.initializeApp();
-    console.log("Firebase Admin initialized with default credentials");
-  }
-
-  const firestore = getFirestore();
-  if (firebaseConfig.firestoreDatabaseId) {
-    firestore.settings({
-      databaseId: firebaseConfig.firestoreDatabaseId,
-      ignoreUndefinedProperties: true
-    });
-    console.log(`Firestore database configured: ${firebaseConfig.firestoreDatabaseId}`);
-  } else {
-    firestore.settings({
-      ignoreUndefinedProperties: true
-    });
-  }
+  // API Routes
+  
+  // Get all products
+  app.get("/api/products", (req, res) => {
+    try {
+      const rows = db.prepare("SELECT * FROM products ORDER BY id DESC").all();
+      res.json({ products: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Helper: Calculate EAN-13 Check Digit
   function getEan13CheckDigit(code12: string): string {
@@ -63,6 +145,7 @@ async function startServer() {
   function generateUniqueEan13(existingBarcodes: Set<string>): string {
     let attempt = 0;
     while (attempt < 1000) {
+      // Custom prefix '201' for internal store distribution
       const random9 = Math.floor(100000000 + Math.random() * 900000000).toString();
       const code12 = '201' + random9;
       const checkDigit = getEan13CheckDigit(code12);
@@ -75,277 +158,112 @@ async function startServer() {
     return '201' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
   }
 
+  // Helper: Validate EAN-13 structure & checksum
+  function isValidEan13(barcode: string): boolean {
+    if (!/^\d{13}$/.test(barcode)) return false;
+    const digits12 = barcode.slice(0, 12);
+    const checkDigit = barcode[12];
+    return getEan13CheckDigit(digits12) === checkDigit;
+  }
+
   // Helper: Validate Code 128 (ASCII characters)
   function isValidCode128(barcode: string): boolean {
     return /^[\x20-\x7E]{1,80}$/.test(barcode);
   }
 
-  // Seed default collections if empty on startup
-  async function seedDefaultData() {
-    try {
-      const productsSnap = await firestore.collection("products").limit(1).get();
-      if (productsSnap.empty) {
-        console.log("Seeding default products to Firestore...");
-        const defaultProducts = [
-          {
-            sku: "AZM-HD-001",
-            barcode: "2019876543210",
-            sku_lower: "azm-hd-001",
-            name: "Heavy Duty Brass Padlock 50mm",
-            name_ar: "قفل نحاسي ثقيل 50 ملم",
-            brand: "Yale",
-            category: "Security & Locks",
-            subcategory: "Padlocks",
-            unit: "pcs",
-            selling_price: 45.00,
-            cost_price: 25.00,
-            vat: 5.0,
-            supplier: "Steel & Rebar Gulf Corp",
-            stock_quantity: 120,
-            description: "Premium heavy-duty double locking brass padlock with hardened steel shackle.",
-            status: "Active"
-          },
-          {
-            sku: "AZM-PL-042",
-            barcode: "2011234567897",
-            sku_lower: "azm-pl-042",
-            name: "High Pressure PVC Pipe 1/2 Inch",
-            name_ar: "أنبوب بي في سي ضغط عالي 1/2 بوصة",
-            brand: "National Plast",
-            category: "Plumbing",
-            subcategory: "Pipes",
-            unit: "meters",
-            selling_price: 12.50,
-            cost_price: 6.00,
-            vat: 5.0,
-            supplier: "National Pipes & Fittings",
-            stock_quantity: 350,
-            description: "Schedule 80 high-pressure PVC plumbing pipe, highly durable and chemical resistant.",
-            status: "Active"
-          },
-          {
-            sku: "AZM-EL-105",
-            barcode: "2015556667771",
-            sku_lower: "azm-el-105",
-            name: "Insulated Wire Copper 2.5mm Reel",
-            name_ar: "لفة سلك نحاس معزول 2.5 ملم",
-            brand: "Ducab",
-            category: "Electrical",
-            subcategory: "Wires & Cables",
-            unit: "reels",
-            selling_price: 185.00,
-            cost_price: 140.00,
-            vat: 5.0,
-            supplier: "Universal Cement Factory",
-            stock_quantity: 45,
-            description: "100-meter reel of high conductivity copper building wire with PVC insulation.",
-            status: "Active"
-          }
-        ];
-        const batch = firestore.batch();
-        for (const p of defaultProducts) {
-          const ref = firestore.collection("products").doc();
-          batch.set(ref, p);
-        }
-        await batch.commit();
-      }
-
-      const customersSnap = await firestore.collection("customers").limit(1).get();
-      if (customersSnap.empty) {
-        console.log("Seeding default customers to Firestore...");
-        const defaultCustomers = [
-          {
-            name: 'Cash Customer',
-            name_lower: 'cash customer',
-            name_ar: 'عميل نقدي',
-            phone: '0501234567',
-            email: 'cash@alrehab.com',
-            trn: '',
-            address: 'Deira, Dubai, UAE',
-            balance: 0.0
-          },
-          {
-            name: 'Al Sahel Contracting LLC',
-            name_lower: 'al sahel contracting llc',
-            name_ar: 'شركة الساحل للمقاولات ذ.م.م',
-            phone: '042233445',
-            email: 'info@alsahel.ae',
-            trn: '100234567800003',
-            address: 'Al Quoz, Dubai, UAE',
-            balance: 5420.50
-          },
-          {
-            name: 'Emirates Heights Builders',
-            name_lower: 'emirates heights builders',
-            name_ar: 'بناة مرتفعات الإمارات',
-            phone: '0569876543',
-            email: 'contact@ehbuilders.ae',
-            trn: '100456789100003',
-            address: 'Sharjah, UAE',
-            balance: 0.0
-          }
-        ];
-        const batch = firestore.batch();
-        for (const c of defaultCustomers) {
-          const ref = firestore.collection("customers").doc();
-          batch.set(ref, c);
-        }
-        await batch.commit();
-      }
-
-      const suppliersSnap = await firestore.collection("suppliers").limit(1).get();
-      if (suppliersSnap.empty) {
-        console.log("Seeding default suppliers to Firestore...");
-        const defaultSuppliers = [
-          {
-            name: 'Steel & Rebar Gulf Corp',
-            name_lower: 'steel & rebar gulf corp',
-            name_ar: 'مؤسسة الخليج للحديد والصلب',
-            contact_person: 'Mr. Robert Chen',
-            phone: '0528889991',
-            email: 'sales@gulfsteel.com',
-            trn: '100999888700003',
-            address: 'Jebel Ali Free Zone, Dubai',
-            balance: -12500.00
-          },
-          {
-            name: 'Universal Cement Factory',
-            name_lower: 'universal cement factory',
-            name_ar: 'مصنع الاسمنت العالمي',
-            contact_person: 'Ahmad Al Mansoori',
-            phone: '037776665',
-            email: 'orders@unicement.ae',
-            trn: '100345112200003',
-            address: 'Al Ain, UAE',
-            balance: 0.0
-          },
-          {
-            name: 'National Pipes & Fittings',
-            name_lower: 'national pipes & fittings',
-            name_ar: 'الوطنية للأنابيب والتجهيزات',
-            contact_person: 'Sanjay Kumar',
-            phone: '065554433',
-            email: 'sanjay@nationalpipes.com',
-            trn: '100888111200003',
-            address: 'Industrial Area 5, Sharjah',
-            balance: -4350.00
-          }
-        ];
-        const batch = firestore.batch();
-        for (const s of defaultSuppliers) {
-          const ref = firestore.collection("suppliers").doc();
-          batch.set(ref, s);
-        }
-        await batch.commit();
-      }
-    } catch (err) {
-      console.error("Seeding error:", err);
-    }
-  }
-
-  await seedDefaultData();
-
-  // API Routes
-
-  // Get all products
-  app.get("/api/products", async (req, res) => {
-    try {
-      const snapshot = await firestore.collection("products").get();
-      const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      res.json({ products });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   // Get dashboard stats
-  app.get("/api/dashboard", async (req, res) => {
+  app.get("/api/dashboard", (req, res) => {
     try {
-      const productsSnap = await firestore.collection("products").get();
-      const invoicesSnap = await firestore.collection("invoices").get();
+      let stats = {
+        totalProducts: 0,
+        noBarcode: 0,
+        lowStock: 0,
+        totalSales: 0,
+        totalInvoices: 0
+      };
+      
+      const totalRow = db.prepare("SELECT count(*) as count FROM products").get() as any;
+      if (totalRow) stats.totalProducts = totalRow.count;
+      
+      const noBarcodeRow = db.prepare("SELECT count(*) as count FROM products WHERE barcode IS NULL OR barcode = ''").get() as any;
+      if (noBarcodeRow) stats.noBarcode = noBarcodeRow.count;
+      
+      const lowStockRow = db.prepare("SELECT count(*) as count FROM products WHERE stock_quantity < 10").get() as any;
+      if (lowStockRow) stats.lowStock = lowStockRow.count;
 
-      let totalProducts = productsSnap.size;
-      let noBarcode = 0;
-      let lowStock = 0;
+      try {
+        const salesRow = db.prepare("SELECT SUM(grand_total) as total FROM invoices").get() as any;
+        if (salesRow && salesRow.total) stats.totalSales = Math.round(salesRow.total * 100) / 100;
 
-      productsSnap.forEach(doc => {
-        const data = doc.data();
-        if (!data.barcode || data.barcode.trim() === "") noBarcode++;
-        if ((data.stock_quantity || 0) < 10) lowStock++;
-      });
-
-      let totalSales = 0;
-      let totalInvoices = invoicesSnap.size;
-      invoicesSnap.forEach(doc => {
-        const data = doc.data();
-        totalSales += (data.grand_total || 0);
-      });
-
-      res.json({
-        totalProducts,
-        noBarcode,
-        lowStock,
-        totalSales: Math.round(totalSales * 100) / 100,
-        totalInvoices
-      });
+        const invoicesCountRow = db.prepare("SELECT count(*) as count FROM invoices").get() as any;
+        if (invoicesCountRow) stats.totalInvoices = invoicesCountRow.count;
+      } catch (err) {
+        // Table may be empty
+      }
+      
+      res.json(stats);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
   // POST: Add a single product with full verification and duplicate detection
-  app.post("/api/products", async (req, res) => {
+  app.post("/api/products", (req, res) => {
     const p = req.body;
     if (!p.sku || !p.name) {
       return res.status(400).json({ error: "SKU and Product Name are required fields." });
     }
 
     try {
-      const skuLower = p.sku.trim().toLowerCase();
-      const existingSkuSnap = await firestore.collection("products").where("sku_lower", "==", skuLower).get();
-      if (!existingSkuSnap.empty) {
+      // Validate SKU uniqueness
+      const existingSku = db.prepare("SELECT id FROM products WHERE LOWER(sku) = LOWER(?)").get(p.sku.trim());
+      if (existingSku) {
         return res.status(400).json({ error: `Duplicate SKU: '${p.sku}' is already assigned to a product.` });
       }
 
       let barcode = p.barcode ? p.barcode.trim() : "";
-      const allProductsSnap = await firestore.collection("products").get();
-      const existingBarcodes = new Set(allProductsSnap.docs.map(doc => (doc.data().barcode || "").toLowerCase()).filter(Boolean));
+      const allBarcodesRows = db.prepare("SELECT barcode FROM products WHERE barcode IS NOT NULL AND barcode != ''").all() as any[];
+      const existingBarcodes = new Set(allBarcodesRows.map(r => r.barcode.toLowerCase()));
 
       if (!barcode) {
-        barcode = generateUniqueEan13(new Set(allProductsSnap.docs.map(doc => doc.data().barcode).filter(Boolean)));
+        // Auto-generate EAN-13 if missing
+        barcode = generateUniqueEan13(new Set(allBarcodesRows.map(r => r.barcode)));
       } else {
+        // Validate uniqueness of custom barcode
         if (existingBarcodes.has(barcode.toLowerCase())) {
           return res.status(400).json({ error: `Duplicate Barcode: '${barcode}' is already in use.` });
         }
+        // General format check (at least Code128 valid)
         if (!isValidCode128(barcode)) {
           return res.status(400).json({ error: "Invalid Barcode format. Only printable ASCII characters are allowed." });
         }
       }
 
-      const productData = {
-        sku: p.sku.trim(),
-        sku_lower: skuLower,
-        barcode,
-        name: p.name.trim(),
-        name_ar: p.name_ar || '',
-        brand: p.brand || '',
-        category: p.category || '',
-        subcategory: p.subcategory || '',
-        unit: p.unit || 'pcs',
-        selling_price: parseFloat(p.selling_price || '0'),
-        cost_price: parseFloat(p.cost_price || '0'),
-        vat: parseFloat(p.vat || '0'),
-        supplier: p.supplier || '',
-        stock_quantity: parseInt(p.stock_quantity || '0', 10),
-        description: p.description || '',
-        status: p.status || 'Active'
-      };
+      const stmt = db.prepare(`INSERT INTO products (
+        sku, barcode, name, name_ar, brand, category, subcategory, unit, selling_price, cost_price, vat, supplier, stock_quantity, description, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
-      const docRef = await firestore.collection("products").add(productData);
+      const result = stmt.run(
+        p.sku.trim(),
+        barcode,
+        p.name.trim(),
+        p.name_ar || '',
+        p.brand || '',
+        p.category || '',
+        p.subcategory || '',
+        p.unit || 'pcs',
+        parseFloat(p.selling_price || '0'),
+        parseFloat(p.cost_price || '0'),
+        parseFloat(p.vat || '0'),
+        p.supplier || '',
+        parseInt(p.stock_quantity || '0', 10),
+        p.description || '',
+        p.status || 'Active'
+      );
 
       res.status(201).json({
         message: "Product created successfully",
-        id: docRef.id,
+        id: result.lastInsertRowid,
         barcode
       });
     } catch (err: any) {
@@ -354,24 +272,25 @@ async function startServer() {
   });
 
   // Bulk add/import products with smart duplicate detection and customizable options
-  app.post("/api/products/import", async (req, res) => {
+  app.post("/api/products/import", (req, res) => {
     const { products, overwrite = true, autoGenerateMissing = true } = req.body;
     if (!products || !Array.isArray(products)) {
       return res.status(400).json({ error: "Invalid products array" });
     }
 
     try {
-      const allDbProductsSnap = await firestore.collection("products").get();
-      const allDbProducts = allDbProductsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      
+      const allDbProducts = db.prepare("SELECT id, sku, barcode FROM products").all() as any[];
       const dbSkus = new Map(allDbProducts.map(p => [p.sku.toLowerCase(), p]));
-      const activeBarcodesRegistry = new Set(allDbProducts.map(p => p.barcode).filter(Boolean));
+      const dbBarcodes = new Set(allDbProducts.map(p => p.barcode ? p.barcode.toLowerCase() : "").filter(Boolean));
 
       const processedProducts: any[] = [];
       const skippedList: any[] = [];
       
       const duplicateSkusInPayload = new Set<string>();
       const duplicateBarcodesInPayload = new Set<string>();
+
+      // Active registry of barcodes we will commit (to prevent collisions during bulk assignment)
+      const activeBarcodesRegistry = new Set(allDbProducts.map(p => p.barcode).filter(Boolean));
 
       let generatedCount = 0;
       let updatedCount = 0;
@@ -386,6 +305,7 @@ async function startServer() {
           continue;
         }
 
+        // Inner payload SKU check
         if (duplicateSkusInPayload.has(skuKey.toLowerCase())) {
           skippedList.push({ sku: skuKey, name: p.name, reason: `Duplicate SKU '${skuKey}' within import file` });
           skippedCount++;
@@ -395,6 +315,7 @@ async function startServer() {
 
         let barcode = p.barcode ? p.barcode.trim() : "";
         if (barcode) {
+          // Inner payload Barcode check
           if (duplicateBarcodesInPayload.has(barcode.toLowerCase())) {
             skippedList.push({ sku: skuKey, name: p.name, reason: `Duplicate Barcode '${barcode}' within import file` });
             skippedCount++;
@@ -417,6 +338,7 @@ async function startServer() {
           insertedCount++;
         }
 
+        // Auto generation flow for blanks or missing
         if (!barcode) {
           if (autoGenerateMissing) {
             barcode = generateUniqueEan13(activeBarcodesRegistry);
@@ -426,6 +348,7 @@ async function startServer() {
             barcode = "";
           }
         } else {
+          // Verify if barcode is already taken by some OTHER item
           const isOwnBarcode = existingDbProduct && existingDbProduct.barcode === barcode;
           if (!isOwnBarcode && activeBarcodesRegistry.has(barcode)) {
             if (autoGenerateMissing) {
@@ -433,6 +356,7 @@ async function startServer() {
               barcode = generateUniqueEan13(activeBarcodesRegistry);
               activeBarcodesRegistry.add(barcode);
               generatedCount++;
+              console.log(`Auto-resolved barcode conflict for SKU ${skuKey}: '${oldBarcode}' -> '${barcode}'`);
             } else {
               skippedList.push({ sku: skuKey, name: p.name, reason: `Barcode '${barcode}' already registered to another item` });
               skippedCount++;
@@ -448,54 +372,35 @@ async function startServer() {
         processedProducts.push(p);
       }
 
-      // Execute Firestore batches
-      const batches: WriteBatch[] = [];
-      let currentBatch = firestore.batch();
-      let opCount = 0;
+      // SQLite transaction for high speed bulk operation
+      const insertOrUpdate = db.prepare(`INSERT OR REPLACE INTO products (
+        id, sku, barcode, name, name_ar, brand, category, subcategory, unit, selling_price, cost_price, vat, supplier, stock_quantity, description, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
-      for (const p of processedProducts) {
-        let docRef;
-        if (p.id) {
-          docRef = firestore.collection("products").doc(String(p.id));
-        } else {
-          docRef = firestore.collection("products").doc();
+      const doImport = db.transaction((list) => {
+        for (const p of list) {
+          insertOrUpdate.run(
+            p.id || null,
+            p.sku.trim(),
+            p.finalBarcode,
+            p.name.trim(),
+            p.name_ar || '',
+            p.brand || '',
+            p.category || '',
+            p.subcategory || '',
+            p.unit || 'pcs',
+            p.selling_price || 0,
+            p.cost_price || 0,
+            p.vat || 0,
+            p.supplier || '',
+            p.stock_quantity || 0,
+            p.description || '',
+            p.status || 'Active'
+          );
         }
+      });
 
-        const productData = {
-          sku: p.sku.trim(),
-          sku_lower: p.sku.trim().toLowerCase(),
-          barcode: p.finalBarcode,
-          name: p.name.trim(),
-          name_ar: p.name_ar || '',
-          brand: p.brand || '',
-          category: p.category || '',
-          subcategory: p.subcategory || '',
-          unit: p.unit || 'pcs',
-          selling_price: parseFloat(p.selling_price || '0'),
-          cost_price: parseFloat(p.cost_price || '0'),
-          vat: parseFloat(p.vat || '0'),
-          supplier: p.supplier || '',
-          stock_quantity: parseInt(p.stock_quantity || '0', 10),
-          description: p.description || '',
-          status: p.status || 'Active'
-        };
-
-        currentBatch.set(docRef, productData, { merge: true });
-        opCount++;
-
-        if (opCount === 500) {
-          batches.push(currentBatch);
-          currentBatch = firestore.batch();
-          opCount = 0;
-        }
-      }
-      if (opCount > 0) {
-        batches.push(currentBatch);
-      }
-
-      for (const batch of batches) {
-        await batch.commit();
-      }
+      doImport(processedProducts);
 
       res.json({
         message: "Import execution completed successfully",
@@ -512,43 +417,25 @@ async function startServer() {
   });
 
   // Bulk scan and auto-generate barcodes for all products missing a barcode
-  app.post("/api/products/generate-missing", async (req, res) => {
+  app.post("/api/products/generate-missing", (req, res) => {
     try {
-      const allProductsSnap = await firestore.collection("products").get();
-      const existingBarcodes = new Set(allProductsSnap.docs.map(doc => String(doc.data().barcode || "")).filter(Boolean));
+      const allProducts = db.prepare("SELECT id, sku, barcode FROM products").all() as any[];
+      const existingBarcodes = new Set(allProducts.map(p => p.barcode).filter(Boolean));
       
-      const missing = allProductsSnap.docs.filter(doc => {
-        const data = doc.data();
-        return !data.barcode || data.barcode.trim() === "";
-      });
+      const missing = allProducts.filter(p => !p.barcode || p.barcode.trim() === "");
       let generated = 0;
 
-      const batches: WriteBatch[] = [];
-      let currentBatch = firestore.batch();
-      let opCount = 0;
-
-      for (const doc of missing) {
-        const newBarcode = generateUniqueEan13(existingBarcodes);
-        existingBarcodes.add(newBarcode);
-
-        currentBatch.update(doc.ref, { barcode: newBarcode });
-        generated++;
-        opCount++;
-
-        if (opCount === 500) {
-          batches.push(currentBatch);
-          currentBatch = firestore.batch();
-          opCount = 0;
+      const updateStmt = db.prepare("UPDATE products SET barcode = ? WHERE id = ?");
+      const doUpdates = db.transaction((items) => {
+        for (const item of items) {
+          const newBarcode = generateUniqueEan13(existingBarcodes);
+          existingBarcodes.add(newBarcode);
+          updateStmt.run(newBarcode, item.id);
+          generated++;
         }
-      }
-      if (opCount > 0) {
-        batches.push(currentBatch);
-      }
+      });
 
-      for (const batch of batches) {
-        await batch.commit();
-      }
-
+      doUpdates(missing);
       res.json({ message: `Successfully generated barcodes for ${generated} products.`, count: generated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -556,30 +443,9 @@ async function startServer() {
   });
   
   // Clear all products
-  app.delete("/api/products", async (req, res) => {
+  app.delete("/api/products", (req, res) => {
     try {
-      const snapshot = await firestore.collection("products").get();
-      const batches: WriteBatch[] = [];
-      let currentBatch = firestore.batch();
-      let opCount = 0;
-
-      snapshot.docs.forEach(doc => {
-        currentBatch.delete(doc.ref);
-        opCount++;
-        if (opCount === 500) {
-          batches.push(currentBatch);
-          currentBatch = firestore.batch();
-          opCount = 0;
-        }
-      });
-      if (opCount > 0) {
-        batches.push(currentBatch);
-      }
-
-      for (const batch of batches) {
-        await batch.commit();
-      }
-
+      db.prepare("DELETE FROM products").run();
       res.json({ message: "All products deleted" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -587,98 +453,64 @@ async function startServer() {
   });
 
   // Get product by barcode (Scanner)
-  app.get("/api/products/scan/:barcode", async (req, res) => {
+  app.get("/api/products/scan/:barcode", (req, res) => {
     const barcode = req.params.barcode;
     try {
-      const barcodeQuery = await firestore.collection("products").where("barcode", "==", barcode).get();
-      if (!barcodeQuery.empty) {
-        const doc = barcodeQuery.docs[0];
-        res.json({ id: doc.id, ...doc.data() });
+      const row = db.prepare("SELECT * FROM products WHERE barcode = ? OR sku = ?").get(barcode, barcode);
+      if (!row) {
+        res.status(404).json({ error: "Product not found" });
         return;
       }
-
-      const skuQuery = await firestore.collection("products").where("sku_lower", "==", barcode.toLowerCase()).get();
-      if (!skuQuery.empty) {
-        const doc = skuQuery.docs[0];
-        res.json({ id: doc.id, ...doc.data() });
-        return;
-      }
-
-      res.status(404).json({ error: "Product not found" });
+      res.json(row);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
   // CUSTOMER MODULE ENDPOINTS
-  app.get("/api/customers", async (req, res) => {
+  app.get("/api/customers", (req, res) => {
     try {
-      const snapshot = await firestore.collection("customers").orderBy("name", "asc").get();
-      const customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      res.json({ customers });
+      const rows = db.prepare("SELECT * FROM customers ORDER BY name ASC").all();
+      res.json({ customers: rows });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post("/api/customers", async (req, res) => {
+  app.post("/api/customers", (req, res) => {
     const { name, name_ar, phone, email, trn, address, balance } = req.body;
     if (!name) return res.status(400).json({ error: "Customer name is required" });
     try {
-      const existing = await firestore.collection("customers").where("name_lower", "==", name.trim().toLowerCase()).get();
-      if (!existing.empty) return res.status(400).json({ error: "Customer name already exists" });
+      const existing = db.prepare("SELECT id FROM customers WHERE LOWER(name) = LOWER(?)").get(name.trim());
+      if (existing) return res.status(400).json({ error: "Customer name already exists" });
 
-      const customerData = {
-        name: name.trim(),
-        name_lower: name.trim().toLowerCase(),
-        name_ar: name_ar || "",
-        phone: phone || "",
-        email: email || "",
-        trn: trn || "",
-        address: address || "",
-        balance: parseFloat(balance || "0")
-      };
-
-      const docRef = await firestore.collection("customers").add(customerData);
-      res.status(201).json({ id: docRef.id, message: "Customer created successfully" });
+      const stmt = db.prepare(`INSERT INTO customers (name, name_ar, phone, email, trn, address, balance) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      const result = stmt.run(name.trim(), name_ar || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"));
+      res.status(201).json({ id: result.lastInsertRowid, message: "Customer created successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.put("/api/customers/:id", async (req, res) => {
-    const id = req.params.id;
+  app.put("/api/customers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     const { name, name_ar, phone, email, trn, address, balance } = req.body;
     if (!name) return res.status(400).json({ error: "Customer name is required" });
     try {
-      const docRef = firestore.collection("customers").doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Customer not found" });
-
-      await docRef.update({
-        name: name.trim(),
-        name_lower: name.trim().toLowerCase(),
-        name_ar: name_ar || "",
-        phone: phone || "",
-        email: email || "",
-        trn: trn || "",
-        address: address || "",
-        balance: parseFloat(balance || "0")
-      });
+      const stmt = db.prepare(`UPDATE customers SET name = ?, name_ar = ?, phone = ?, email = ?, trn = ?, address = ?, balance = ? WHERE id = ?`);
+      const result = stmt.run(name.trim(), name_ar || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Customer not found" });
       res.json({ message: "Customer updated successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.delete("/api/customers/:id", async (req, res) => {
-    const id = req.params.id;
+  app.delete("/api/customers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     try {
-      const docRef = firestore.collection("customers").doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Customer not found" });
-
-      await docRef.delete();
+      const result = db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+      if (result.changes === 0) return res.status(404).json({ error: "Customer not found" });
       res.json({ message: "Customer deleted successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -686,76 +518,49 @@ async function startServer() {
   });
 
   // SUPPLIER MODULE ENDPOINTS
-  app.get("/api/suppliers", async (req, res) => {
+  app.get("/api/suppliers", (req, res) => {
     try {
-      const snapshot = await firestore.collection("suppliers").orderBy("name", "asc").get();
-      const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      res.json({ suppliers });
+      const rows = db.prepare("SELECT * FROM suppliers ORDER BY name ASC").all();
+      res.json({ suppliers: rows });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post("/api/suppliers", async (req, res) => {
+  app.post("/api/suppliers", (req, res) => {
     const { name, name_ar, contact_person, phone, email, trn, address, balance } = req.body;
     if (!name) return res.status(400).json({ error: "Supplier name is required" });
     try {
-      const existing = await firestore.collection("suppliers").where("name_lower", "==", name.trim().toLowerCase()).get();
-      if (!existing.empty) return res.status(400).json({ error: "Supplier name already exists" });
+      const existing = db.prepare("SELECT id FROM suppliers WHERE LOWER(name) = LOWER(?)").get(name.trim());
+      if (existing) return res.status(400).json({ error: "Supplier name already exists" });
 
-      const supplierData = {
-        name: name.trim(),
-        name_lower: name.trim().toLowerCase(),
-        name_ar: name_ar || "",
-        contact_person: contact_person || "",
-        phone: phone || "",
-        email: email || "",
-        trn: trn || "",
-        address: address || "",
-        balance: parseFloat(balance || "0")
-      };
-
-      const docRef = await firestore.collection("suppliers").add(supplierData);
-      res.status(201).json({ id: docRef.id, message: "Supplier created successfully" });
+      const stmt = db.prepare(`INSERT INTO suppliers (name, name_ar, contact_person, phone, email, trn, address, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+      const result = stmt.run(name.trim(), name_ar || "", contact_person || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"));
+      res.status(201).json({ id: result.lastInsertRowid, message: "Supplier created successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.put("/api/suppliers/:id", async (req, res) => {
-    const id = req.params.id;
+  app.put("/api/suppliers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     const { name, name_ar, contact_person, phone, email, trn, address, balance } = req.body;
     if (!name) return res.status(400).json({ error: "Supplier name is required" });
     try {
-      const docRef = firestore.collection("suppliers").doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Supplier not found" });
-
-      await docRef.update({
-        name: name.trim(),
-        name_lower: name.trim().toLowerCase(),
-        name_ar: name_ar || "",
-        contact_person: contact_person || "",
-        phone: phone || "",
-        email: email || "",
-        trn: trn || "",
-        address: address || "",
-        balance: parseFloat(balance || "0")
-      });
+      const stmt = db.prepare(`UPDATE suppliers SET name = ?, name_ar = ?, contact_person = ?, phone = ?, email = ?, trn = ?, address = ?, balance = ? WHERE id = ?`);
+      const result = stmt.run(name.trim(), name_ar || "", contact_person || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Supplier not found" });
       res.json({ message: "Supplier updated successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.delete("/api/suppliers/:id", async (req, res) => {
-    const id = req.params.id;
+  app.delete("/api/suppliers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     try {
-      const docRef = firestore.collection("suppliers").doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Supplier not found" });
-
-      await docRef.delete();
+      const result = db.prepare("DELETE FROM suppliers WHERE id = ?").run(id);
+      if (result.changes === 0) return res.status(404).json({ error: "Supplier not found" });
       res.json({ message: "Supplier deleted successfully" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -763,36 +568,31 @@ async function startServer() {
   });
 
   // INVOICING WORKFLOW WITH STOCK REDUCTION & CREDIT MANAGER
-  app.get("/api/invoices", async (req, res) => {
+  app.get("/api/invoices", (req, res) => {
     try {
-      const snapshot = await firestore.collection("invoices").orderBy("created_at", "desc").get();
-      const invoices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      res.json({ invoices });
-    } catch (err: any) {
-      // Fallback if ordering by created_at index fails
-      try {
-        const backupSnapshot = await firestore.collection("invoices").get();
-        const invoices = backupSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        invoices.sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-        res.json({ invoices });
-      } catch (innerErr: any) {
-        res.status(500).json({ error: innerErr.message });
-      }
-    }
-  });
-
-  app.get("/api/invoices/:id", async (req, res) => {
-    const id = req.params.id;
-    try {
-      const doc = await firestore.collection("invoices").doc(id).get();
-      if (!doc.exists) return res.status(404).json({ error: "Invoice not found" });
-      res.json({ id: doc.id, ...doc.data() });
+      const rows = db.prepare("SELECT * FROM invoices ORDER BY id DESC").all();
+      res.json({ invoices: rows });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post("/api/invoices", async (req, res) => {
+  app.get("/api/invoices/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    try {
+      const invoice = db.prepare("SELECT * FROM invoices WHERE id = ?").get(id) as any;
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      
+      const items = db.prepare("SELECT * FROM invoice_items WHERE invoice_id = ?").all(id) as any[];
+      invoice.items = items;
+      
+      res.json(invoice);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/invoices", (req, res) => {
     const {
       customer_id,
       customer_name,
@@ -813,70 +613,70 @@ async function startServer() {
     }
 
     try {
+      // Create unique serial Invoice Number
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const invoicesTodaySnap = await firestore.collection("invoices")
-        .where("date_yyyymmdd", "==", today)
-        .get();
-      
-      const sequence = (invoicesTodaySnap.size + 1).toString().padStart(4, "0");
+      const invoiceCountRow = db.prepare("SELECT count(*) as count FROM invoices WHERE invoice_number LIKE ?").get(`INV-${today}-%`) as any;
+      const sequence = (invoiceCountRow.count + 1).toString().padStart(4, "0");
       const invoice_number = `INV-${today}-${sequence}`;
 
-      const invoiceId = await firestore.runTransaction(async (transaction) => {
-        // Update product stock levels
+      // Insert within robust SQLite Transaction
+      const createInvoiceTx = db.transaction(() => {
+        const invoiceStmt = db.prepare(`INSERT INTO invoices (
+          invoice_number, customer_id, customer_name, customer_trn, date, subtotal, discount, vat_amount, grand_total, payment_status, payment_method, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+        const invoiceResult = invoiceStmt.run(
+          invoice_number,
+          customer_id || null,
+          customer_name || "Cash Customer",
+          customer_trn || "",
+          date || new Date().toISOString().slice(0, 10),
+          parseFloat(subtotal || "0"),
+          parseFloat(discount || "0"),
+          parseFloat(vat_amount || "0"),
+          parseFloat(grand_total || "0"),
+          payment_status || "Paid",
+          payment_method || "Cash",
+          notes || ""
+        );
+
+        const invoiceId = invoiceResult.lastInsertRowid;
+
+        const itemStmt = db.prepare(`INSERT INTO invoice_items (
+          invoice_id, product_id, product_name, sku, barcode, quantity, unit_price, vat_rate, vat_amount, total_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+        const updateStockStmt = db.prepare(`UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`);
+
         for (const item of items) {
-          const productRef = firestore.collection("products").doc(String(item.product_id));
-          const productDoc = await transaction.get(productRef);
-          if (productDoc.exists) {
-            const currentStock = productDoc.data()?.stock_quantity || 0;
-            transaction.update(productRef, { stock_quantity: currentStock - (item.quantity || 0) });
-          }
+          itemStmt.run(
+            invoiceId,
+            item.product_id,
+            item.product_name,
+            item.sku,
+            item.barcode,
+            item.quantity,
+            item.unit_price,
+            item.vat_rate || 5.0,
+            item.vat_amount || 0,
+            item.total_amount || 0
+          );
+
+          // Update stock counts
+          updateStockStmt.run(item.quantity, item.product_id);
         }
 
         // Adjust customer credit/balance if they buy on credit
         if (customer_id && payment_status !== "Paid") {
-          const customerRef = firestore.collection("customers").doc(String(customer_id));
-          const customerDoc = await transaction.get(customerRef);
-          if (customerDoc.exists) {
-            const currentBalance = customerDoc.data()?.balance || 0;
-            const unpaidAmount = parseFloat(grand_total || "0");
-            transaction.update(customerRef, { balance: currentBalance + unpaidAmount });
-          }
+          const unpaidAmount = parseFloat(grand_total || "0");
+          const updateCustomerStmt = db.prepare(`UPDATE customers SET balance = balance + ? WHERE id = ?`);
+          updateCustomerStmt.run(unpaidAmount, customer_id);
         }
 
-        // Save invoice document
-        const invoiceRef = firestore.collection("invoices").doc();
-        const invoiceData = {
-          invoice_number,
-          customer_id: customer_id || null,
-          customer_name: customer_name || "Cash Customer",
-          customer_trn: customer_trn || "",
-          date: date || new Date().toISOString().slice(0, 10),
-          date_yyyymmdd: today,
-          subtotal: parseFloat(subtotal || "0"),
-          discount: parseFloat(discount || "0"),
-          vat_amount: parseFloat(vat_amount || "0"),
-          grand_total: parseFloat(grand_total || "0"),
-          payment_status: payment_status || "Paid",
-          payment_method: payment_method || "Cash",
-          notes: notes || "",
-          items: items.map(item => ({
-            product_id: item.product_id,
-            product_name: item.product_name,
-            sku: item.sku,
-            barcode: item.barcode,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            vat_rate: item.vat_rate || 5.0,
-            vat_amount: item.vat_amount || 0,
-            total_amount: item.total_amount || 0
-          })),
-          created_at: FieldValue.serverTimestamp()
-        };
-
-        transaction.set(invoiceRef, invoiceData);
-        return invoiceRef.id;
+        return invoiceId;
       });
 
+      const invoiceId = createInvoiceTx();
       res.status(201).json({
         id: invoiceId,
         invoice_number,
@@ -887,43 +687,33 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/invoices/:id", async (req, res) => {
-    const id = req.params.id;
+  app.delete("/api/invoices/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     try {
-      await firestore.runTransaction(async (transaction) => {
-        const invoiceRef = firestore.collection("invoices").doc(id);
-        const invoiceDoc = await transaction.get(invoiceRef);
-        if (!invoiceDoc.exists) {
-          throw new Error("Invoice not found");
-        }
+      const invoice = db.prepare("SELECT * FROM invoices WHERE id = ?").get(id) as any;
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
-        const invoice = invoiceDoc.data() || {};
-        const items = invoice.items || [];
+      const items = db.prepare("SELECT * FROM invoice_items WHERE invoice_id = ?").all(id) as any[];
 
+      const deleteTx = db.transaction(() => {
         // Revert product stock levels
+        const updateStockStmt = db.prepare("UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?");
         for (const item of items) {
-          const productRef = firestore.collection("products").doc(String(item.product_id));
-          const productDoc = await transaction.get(productRef);
-          if (productDoc.exists) {
-            const currentStock = productDoc.data()?.stock_quantity || 0;
-            transaction.update(productRef, { stock_quantity: currentStock + (item.quantity || 0) });
-          }
+          updateStockStmt.run(item.quantity, item.product_id);
         }
 
         // Revert customer credit balance
         if (invoice.customer_id && invoice.payment_status !== "Paid") {
-          const customerRef = firestore.collection("customers").doc(String(invoice.customer_id));
-          const customerDoc = await transaction.get(customerRef);
-          if (customerDoc.exists) {
-            const currentBalance = customerDoc.data()?.balance || 0;
-            transaction.update(customerRef, { balance: currentBalance - (invoice.grand_total || 0) });
-          }
+          const revertBalanceStmt = db.prepare("UPDATE customers SET balance = balance - ? WHERE id = ?");
+          revertBalanceStmt.run(invoice.grand_total, invoice.customer_id);
         }
 
-        // Delete invoice document
-        transaction.delete(invoiceRef);
+        // Delete items and invoice records
+        db.prepare("DELETE FROM invoice_items WHERE invoice_id = ?").run(id);
+        db.prepare("DELETE FROM invoices WHERE id = ?").run(id);
       });
 
+      deleteTx();
       res.json({ message: "Invoice removed. Product inventory stock levels and customer balance reverted." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -931,18 +721,16 @@ async function startServer() {
   });
 
   // DIRECT STOCK INVENTORY UPDATER
-  app.put("/api/products/:id/stock", async (req, res) => {
-    const id = req.params.id;
+  app.put("/api/products/:id/stock", (req, res) => {
+    const id = parseInt(req.params.id, 10);
     const { stock_quantity } = req.body;
     if (stock_quantity === undefined || isNaN(parseInt(stock_quantity, 10))) {
       return res.status(400).json({ error: "stock_quantity is required and must be an integer" });
     }
     try {
-      const docRef = firestore.collection("products").doc(id);
-      const doc = await docRef.get();
-      if (!doc.exists) return res.status(404).json({ error: "Product not found" });
-
-      await docRef.update({ stock_quantity: parseInt(stock_quantity, 10) });
+      const stmt = db.prepare("UPDATE products SET stock_quantity = ? WHERE id = ?");
+      const result = stmt.run(parseInt(stock_quantity, 10), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Product not found" });
       res.json({ stock_quantity, message: "Inventory stock updated successfully." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -959,6 +747,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    // Important: Use * for express v4, but we'll stick to a robust fallback
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

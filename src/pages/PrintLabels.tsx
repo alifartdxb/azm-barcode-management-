@@ -46,8 +46,8 @@ export default function PrintLabels() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Selection and Quantity Maps
-  const [selectedIds, setSelectedIds] = useState<Set<any>>(new Set());
-  const [quantities, setQuantities] = useState<Record<any, number>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
   
   // Active Template State
   const [selectedTemplateId, setSelectedTemplateId] = useState('L7160');
@@ -102,8 +102,8 @@ export default function PrintLabels() {
         setProducts(prods);
         
         // Pre-select first 3 products to show quick previews, and initialize quantities to 5
-        const initialSelected = new Set<any>();
-        const initialQtys: Record<any, number> = {};
+        const initialSelected = new Set<number>();
+        const initialQtys: Record<number, number> = {};
         prods.forEach((p: Product, i: number) => {
           initialQtys[p.id] = 5;
           if (i < 3) {

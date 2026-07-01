@@ -1229,7 +1229,7 @@ export default function Billing() {
                     <span>* Thank You For Visiting *</span>
                     <span>AL REHAB BUILDING MATERIALS</span>
                     <span>E-Invoice generated in database</span>
-                    <span>Cloud ID: {selectedInvoice.id}</span>
+                    <span>sqlite3 ID: {selectedInvoice.id}</span>
                   </div>
 
                 </div>

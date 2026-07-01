@@ -51,13 +51,21 @@ export default function Products() {
   const fetchProducts = () => {
     setLoading(true);
     fetch('/api/products')
-      .then(res => res.json())
+      .then(async res => {
+        const isJson = res.headers.get('content-type')?.includes('application/json');
+        const data = isJson ? await res.json() : null;
+        if (!res.ok) {
+          throw new Error(data?.error || `Server responded with status ${res.status}`);
+        }
+        return data;
+      })
       .then(data => {
         setProducts(data.products || []);
         setLoading(false);
       })
       .catch(err => {
         console.error(err);
+        setMessage({ type: 'error', text: 'Failed to load products: ' + err.message });
         setLoading(false);
       });
   };
@@ -305,11 +313,11 @@ export default function Products() {
               category: getVal(row.category || row.Category || ''),
               subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
-              selling_price: parseFloat(row.selling_price || row['Selling Price'] || '0') || 0,
-              cost_price: parseFloat(row.cost_price || row['Cost Price'] || '0') || 0,
-              vat: parseFloat(row.vat || row.VAT || '0') || 0,
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
-              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || '0', 10) || 0,
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || '0', 10) || 0,
               description: getVal(row.description || row.Description || ''),
               status: getVal(row.status || row.Status || 'Active')
             };
@@ -342,11 +350,11 @@ export default function Products() {
               category: getVal(row.category || row.Category || ''),
               subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
-              selling_price: parseFloat(row.selling_price || row['Selling Price'] || '0') || 0,
-              cost_price: parseFloat(row.cost_price || row['Cost Price'] || '0') || 0,
-              vat: parseFloat(row.vat || row.VAT || '0') || 0,
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
-              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || '0', 10) || 0,
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || '0', 10) || 0,
               description: getVal(row.description || row.Description || ''),
               status: getVal(row.status || row.Status || 'Active')
             };
@@ -376,7 +384,14 @@ export default function Products() {
         autoGenerateMissing: generateMissingOnImport
       })
     })
-    .then(res => res.json())
+    .then(async res => {
+      const isJson = res.headers.get('content-type')?.includes('application/json');
+      const data = isJson ? await res.json() : null;
+      if (!res.ok) {
+        throw new Error(data?.error || `Server responded with status ${res.status}`);
+      }
+      return data;
+    })
     .then(data => {
       let statsText = `Successfully processed ${data.count} items.`;
       if (data.inserted > 0) statsText += ` Added: ${data.inserted}.`;
@@ -410,7 +425,14 @@ export default function Products() {
     if (confirm(`Do you want to automatically generate EAN-13 barcodes for the ${missingCount} products with missing barcodes?`)) {
       setLoading(true);
       fetch('/api/products/generate-missing', { method: 'POST' })
-        .then(res => res.json())
+        .then(async res => {
+          const isJson = res.headers.get('content-type')?.includes('application/json');
+          const data = isJson ? await res.json() : null;
+          if (!res.ok) {
+            throw new Error(data?.error || `Server responded with status ${res.status}`);
+          }
+          return data;
+        })
         .then(data => {
           setMessage({ type: 'success', text: data.message });
           fetchProducts();
@@ -425,11 +447,21 @@ export default function Products() {
   const handleClearAll = () => {
     if (confirm('Are you sure you want to delete all products? This action cannot be undone.')) {
       fetch('/api/products', { method: 'DELETE' })
+        .then(async res => {
+          const isJson = res.headers.get('content-type')?.includes('application/json');
+          const data = isJson ? await res.json() : null;
+          if (!res.ok) {
+            throw new Error(data?.error || `Server responded with status ${res.status}`);
+          }
+          return data;
+        })
         .then(() => {
           setMessage({ type: 'success', text: 'Product inventory cleared completely.' });
           fetchProducts();
         })
-        .catch(console.error);
+        .catch(err => {
+          setMessage({ type: 'error', text: 'Failed to clear data: ' + err.message });
+        });
     }
   };
 

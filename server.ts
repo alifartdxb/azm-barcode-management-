@@ -379,21 +379,25 @@ async function startServer() {
 
       const doImport = db.transaction((list) => {
         for (const p of list) {
+          const safeSku = String(p.sku || '').trim();
+          const safeName = String(p.name || 'Unknown Product').trim();
+          const safeBarcode = String(p.finalBarcode || p.barcode || '').trim();
+          
           insertOrUpdate.run(
             p.id || null,
-            p.sku.trim(),
-            p.finalBarcode,
-            p.name.trim(),
+            safeSku,
+            safeBarcode || null,
+            safeName,
             p.name_ar || '',
             p.brand || '',
             p.category || '',
             p.subcategory || '',
             p.unit || 'pcs',
-            p.selling_price || 0,
-            p.cost_price || 0,
-            p.vat || 0,
+            parseFloat(p.selling_price) || 0,
+            parseFloat(p.cost_price) || 0,
+            parseFloat(p.vat) || 0,
             p.supplier || '',
-            p.stock_quantity || 0,
+            parseInt(p.stock_quantity, 10) || 0,
             p.description || '',
             p.status || 'Active'
           );
@@ -737,6 +741,11 @@ async function startServer() {
     }
   });
 
+  // 404 API Route Fallback - ensure unmatched /api routes return JSON instead of index.html fallback
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.url}` });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -752,6 +761,14 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Global Error Handler - ensure unhandled middleware errors (like payload too large) return JSON instead of HTML
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled server error:", err);
+    res.status(err.status || 500).json({
+      error: err.message || "An unexpected server error occurred"
+    });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

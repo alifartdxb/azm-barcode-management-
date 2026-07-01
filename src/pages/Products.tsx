@@ -166,6 +166,71 @@ export default function Products() {
     setNewBarcode(generated);
   };
 
+  const handleExportCSV = () => {
+    if (filteredProducts.length === 0) {
+      alert("No inventory data to export matching current filter.");
+      return;
+    }
+    // Prepare clean data for CSV export
+    const cleanData = filteredProducts.map(({ id, ...p }) => ({
+      SKU: p.sku,
+      Barcode: p.barcode || '',
+      Name: p.name,
+      'Arabic Name': p.name_ar || '',
+      Brand: p.brand || '',
+      Category: p.category || '',
+      Subcategory: p.subcategory || '',
+      Unit: p.unit || 'pcs',
+      'Selling Price (AED)': p.selling_price,
+      'Cost Price (AED)': p.cost_price,
+      'VAT (%)': p.vat,
+      Supplier: p.supplier || '',
+      'Stock Quantity': p.stock_quantity,
+      Description: p.description || '',
+      Status: p.status || 'Active'
+    }));
+
+    const csv = Papa.unparse(cleanData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `inventory_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    if (filteredProducts.length === 0) {
+      alert("No inventory data to export matching current filter.");
+      return;
+    }
+    // Prepare clean data for Excel export
+    const cleanData = filteredProducts.map(({ id, ...p }) => ({
+      SKU: p.sku,
+      Barcode: p.barcode || '',
+      Name: p.name,
+      'Arabic Name': p.name_ar || '',
+      Brand: p.brand || '',
+      Category: p.category || '',
+      Subcategory: p.subcategory || '',
+      Unit: p.unit || 'pcs',
+      'Selling Price (AED)': p.selling_price,
+      'Cost Price (AED)': p.cost_price,
+      'VAT (%)': p.vat,
+      Supplier: p.supplier || '',
+      'Stock Quantity': p.stock_quantity,
+      Description: p.description || '',
+      Status: p.status || 'Active'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(cleanData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory_Report');
+    XLSX.writeFile(workbook, `inventory_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const processRawProducts = (rawProducts: any[]) => {
     // Analyze and extract stats for the user
     let blankBarcodes = 0;
@@ -400,7 +465,7 @@ export default function Products() {
           
           <input
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             ref={fileInputRef}
             className="hidden"
             onChange={handleFileUpload}
@@ -411,7 +476,23 @@ export default function Products() {
             className="bg-brand-accent text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
           >
             {importing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            + Import CSV
+            + Import Excel/CSV
+          </button>
+
+          <button 
+            onClick={handleExportExcel}
+            className="bg-[#217346] text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Export Excel
+          </button>
+
+          <button 
+            onClick={handleExportCSV}
+            className="bg-brand-ink text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Export CSV
           </button>
 
           <button 

@@ -5,6 +5,8 @@ import {
   Coins, FileSpreadsheet, Sparkles, ArrowRight, UserCheck, Eye, X, Calendar
 } from 'lucide-react';
 import { Product, Customer, Invoice, InvoiceItem } from '../types';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 export default function Billing() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -304,6 +306,61 @@ export default function Billing() {
     } catch (err) {
       console.error('Error deleting invoice:', err);
     }
+  };
+
+  const handleExportSalesReportCSV = () => {
+    if (invoices.length === 0) {
+      alert("No sales records to export.");
+      return;
+    }
+    const cleanData = invoices.map(inv => ({
+      'Invoice Number': inv.invoice_number,
+      'Date': inv.date,
+      'Customer Name': inv.customer_name,
+      'Customer TRN': inv.customer_trn || '',
+      'Payment Status': inv.payment_status,
+      'Payment Method': inv.payment_method,
+      'Subtotal (AED)': inv.subtotal,
+      'VAT Amount (AED)': inv.vat_amount,
+      'Discount (AED)': inv.discount,
+      'Grand Total (AED)': inv.grand_total,
+      'Notes': inv.notes || ''
+    }));
+
+    const csv = Papa.unparse(cleanData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `sales_report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportSalesReportExcel = () => {
+    if (invoices.length === 0) {
+      alert("No sales records to export.");
+      return;
+    }
+    const cleanData = invoices.map(inv => ({
+      'Invoice Number': inv.invoice_number,
+      'Date': inv.date,
+      'Customer Name': inv.customer_name,
+      'Customer TRN': inv.customer_trn || '',
+      'Payment Status': inv.payment_status,
+      'Payment Method': inv.payment_method,
+      'Subtotal (AED)': inv.subtotal,
+      'VAT Amount (AED)': inv.vat_amount,
+      'Discount (AED)': inv.discount,
+      'Grand Total (AED)': inv.grand_total,
+      'Notes': inv.notes || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(cleanData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sales_Report');
+    XLSX.writeFile(workbook, `sales_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const filteredProdSearchResults = products.filter(p => 
@@ -747,7 +804,25 @@ export default function Billing() {
         <div className="flex-1 flex flex-col p-4 overflow-auto gap-4 print:hidden">
           
           <div className="bg-white border-2 border-brand-line p-4 shadow-[4px_4px_0_rgba(0,0,0,0.1)]">
-            <h2 className="font-sans font-black text-xs uppercase tracking-wider text-brand-ink mb-3">Enterprise Sales Ledger</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 border-b-2 border-brand-line pb-3">
+              <h2 className="font-sans font-black text-xs uppercase tracking-wider text-brand-ink">Enterprise Sales Ledger</h2>
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleExportSalesReportExcel}
+                  className="bg-[#217346] text-white border border-brand-line px-3 py-1.5 text-[10px] font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Export Excel Report
+                </button>
+                <button 
+                  onClick={handleExportSalesReportCSV}
+                  className="bg-brand-ink text-white border border-brand-line px-3 py-1.5 text-[10px] font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Export CSV Report
+                </button>
+              </div>
+            </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">

@@ -5,11 +5,13 @@
 
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, Tag, Printer, ScanBarcode, Settings, Search } from 'lucide-react';
+import { LayoutDashboard, Package, Tag, Printer, ScanBarcode, Settings, Search, Coins, Users } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import PrintLabels from './pages/PrintLabels';
 import Scanner from './pages/Scanner';
+import Billing from './pages/Billing';
+import Partners from './pages/Partners';
 
 function Sidebar() {
   const location = useLocation();
@@ -17,11 +19,13 @@ function Sidebar() {
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/products', label: 'Product Database', icon: Package },
     { to: '/print', label: 'Bulk Printing Engine', icon: Printer },
+    { to: '/billing', label: 'POS & Billing', icon: Coins },
+    { to: '/partners', label: 'CRM & Partners', icon: Users },
     { to: '/scanner', label: 'Scanner Status', icon: ScanBarcode },
   ];
 
   return (
-    <div className="w-[220px] bg-brand-sidebar border-r-2 border-brand-line flex flex-col font-sans">
+    <div className="w-[220px] bg-brand-sidebar border-r-2 border-brand-line flex flex-col font-sans print:hidden">
       <nav className="flex-1 flex flex-col">
         {links.map((link) => {
           const Icon = link.icon;
@@ -64,8 +68,8 @@ function AppContent() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-brand-bg font-sans border-2 border-brand-line overflow-hidden m-0 box-border text-brand-ink">
-      <div className="h-[50px] border-b-2 border-brand-line bg-white flex items-center justify-between px-4 shrink-0">
+    <div className="flex flex-col h-screen bg-brand-bg font-sans border-2 border-brand-line overflow-hidden m-0 box-border text-brand-ink print:h-auto print:overflow-visible print:border-none">
+      <div className="h-[50px] border-b-2 border-brand-line bg-white flex items-center justify-between px-4 shrink-0 print:hidden">
         <div className="flex items-center gap-4">
           <span className="font-black tracking-tighter text-xl">AZM ABLMS v1.0</span>
           <form onSubmit={handleSearch} className="flex ml-6 border border-brand-line bg-white hidden md:flex">
@@ -94,18 +98,20 @@ function AppContent() {
           </button>
         </div>
       </div>
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden print:block print:h-auto print:overflow-visible">
         <Sidebar />
-        <main className="flex-1 overflow-auto flex flex-col bg-brand-bg">
+        <main className="flex-1 overflow-auto flex flex-col bg-brand-bg print:block print:h-auto print:overflow-visible">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/products" element={<Products />} />
             <Route path="/print" element={<PrintLabels />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/partners" element={<Partners />} />
             <Route path="/scanner" element={<Scanner />} />
           </Routes>
         </main>
       </div>
-      <div className="h-[28px] border-t-2 border-brand-line bg-brand-ink text-white flex items-center justify-between px-3 font-mono text-[10px] shrink-0">
+      <div className="h-[28px] border-t-2 border-brand-line bg-brand-ink text-white flex items-center justify-between px-3 font-mono text-[10px] shrink-0 print:hidden">
         <div>SYSTEM: OPERATIONAL | DB: azm_inv.sqlite</div>
         <div className="flex gap-4">
           <span>SEARCH: 12ms</span>

@@ -12,10 +12,12 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
 
   // Initialize SQLite Database
-  let db;
+  let db: any;
   try {
     db = new Database('./database.sqlite');
     console.log('Connected to the SQLite database.');
+    
+    // 1. Products Table
     db.exec(`CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sku TEXT UNIQUE,
@@ -34,6 +36,84 @@ async function startServer() {
       description TEXT,
       status TEXT
     )`);
+
+    // 2. Customers Table
+    db.exec(`CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE,
+      name_ar TEXT,
+      phone TEXT,
+      email TEXT,
+      trn TEXT,
+      address TEXT,
+      balance REAL DEFAULT 0.0
+    )`);
+
+    // 3. Suppliers Table
+    db.exec(`CREATE TABLE IF NOT EXISTS suppliers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE,
+      name_ar TEXT,
+      contact_person TEXT,
+      phone TEXT,
+      email TEXT,
+      trn TEXT,
+      address TEXT,
+      balance REAL DEFAULT 0.0
+    )`);
+
+    // 4. Invoices Table
+    db.exec(`CREATE TABLE IF NOT EXISTS invoices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_number TEXT UNIQUE,
+      customer_id INTEGER,
+      customer_name TEXT,
+      customer_trn TEXT,
+      date TEXT,
+      subtotal REAL,
+      discount REAL,
+      vat_amount REAL,
+      grand_total REAL,
+      payment_status TEXT,
+      payment_method TEXT,
+      notes TEXT
+    )`);
+
+    // 5. Invoice Items Table
+    db.exec(`CREATE TABLE IF NOT EXISTS invoice_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id INTEGER,
+      product_id INTEGER,
+      product_name TEXT,
+      sku TEXT,
+      barcode TEXT,
+      quantity INTEGER,
+      unit_price REAL,
+      vat_rate REAL,
+      vat_amount REAL,
+      total_amount REAL
+    )`);
+
+    // Seed default customers if empty
+    const customerCount = db.prepare("SELECT count(*) as count FROM customers").get() as any;
+    if (customerCount.count === 0) {
+      db.prepare(`INSERT INTO customers (name, name_ar, phone, email, trn, address, balance) VALUES 
+        ('Cash Customer', 'عميل نقدي', '0501234567', 'cash@alrehab.com', '', 'Deira, Dubai, UAE', 0.0),
+        ('Al Sahel Contracting LLC', 'شركة الساحل للمقاولات ذ.م.م', '042233445', 'info@alsahel.ae', '100234567800003', 'Al Quoz, Dubai, UAE', 5420.50),
+        ('Emirates Heights Builders', 'بناة مرتفعات الإمارات', '0569876543', 'contact@ehbuilders.ae', '100456789100003', 'Sharjah, UAE', 0.0)
+      `).run();
+    }
+
+    // Seed default suppliers if empty
+    const supplierCount = db.prepare("SELECT count(*) as count FROM suppliers").get() as any;
+    if (supplierCount.count === 0) {
+      db.prepare(`INSERT INTO suppliers (name, name_ar, contact_person, phone, email, trn, address, balance) VALUES 
+        ('Steel & Rebar Gulf Corp', 'مؤسسة الخليج للحديد والصلب', 'Mr. Robert Chen', '0528889991', 'sales@gulfsteel.com', '100999888700003', 'Jebel Ali Free Zone, Dubai', -12500.00),
+        ('Universal Cement Factory', 'مصنع الاسمنت العالمي', 'Ahmad Al Mansoori', '037776665', 'orders@unicement.ae', '100345112200003', 'Al Ain, UAE', 0.0),
+        ('National Pipes & Fittings', 'الوطنية للأنابيب والتجهيزات', 'Sanjay Kumar', '065554433', 'sanjay@nationalpipes.com', '100888111200003', 'Industrial Area 5, Sharjah', -4350.00)
+      `).run();
+    }
+
   } catch (err: any) {
     console.error('Error opening database', err.message);
   }
@@ -98,6 +178,8 @@ async function startServer() {
         totalProducts: 0,
         noBarcode: 0,
         lowStock: 0,
+        totalSales: 0,
+        totalInvoices: 0
       };
       
       const totalRow = db.prepare("SELECT count(*) as count FROM products").get() as any;
@@ -108,6 +190,16 @@ async function startServer() {
       
       const lowStockRow = db.prepare("SELECT count(*) as count FROM products WHERE stock_quantity < 10").get() as any;
       if (lowStockRow) stats.lowStock = lowStockRow.count;
+
+      try {
+        const salesRow = db.prepare("SELECT SUM(grand_total) as total FROM invoices").get() as any;
+        if (salesRow && salesRow.total) stats.totalSales = Math.round(salesRow.total * 100) / 100;
+
+        const invoicesCountRow = db.prepare("SELECT count(*) as count FROM invoices").get() as any;
+        if (invoicesCountRow) stats.totalInvoices = invoicesCountRow.count;
+      } catch (err) {
+        // Table may be empty
+      }
       
       res.json(stats);
     } catch (err: any) {
@@ -370,6 +462,276 @@ async function startServer() {
         return;
       }
       res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // CUSTOMER MODULE ENDPOINTS
+  app.get("/api/customers", (req, res) => {
+    try {
+      const rows = db.prepare("SELECT * FROM customers ORDER BY name ASC").all();
+      res.json({ customers: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/customers", (req, res) => {
+    const { name, name_ar, phone, email, trn, address, balance } = req.body;
+    if (!name) return res.status(400).json({ error: "Customer name is required" });
+    try {
+      const existing = db.prepare("SELECT id FROM customers WHERE LOWER(name) = LOWER(?)").get(name.trim());
+      if (existing) return res.status(400).json({ error: "Customer name already exists" });
+
+      const stmt = db.prepare(`INSERT INTO customers (name, name_ar, phone, email, trn, address, balance) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      const result = stmt.run(name.trim(), name_ar || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"));
+      res.status(201).json({ id: result.lastInsertRowid, message: "Customer created successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/customers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const { name, name_ar, phone, email, trn, address, balance } = req.body;
+    if (!name) return res.status(400).json({ error: "Customer name is required" });
+    try {
+      const stmt = db.prepare(`UPDATE customers SET name = ?, name_ar = ?, phone = ?, email = ?, trn = ?, address = ?, balance = ? WHERE id = ?`);
+      const result = stmt.run(name.trim(), name_ar || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Customer not found" });
+      res.json({ message: "Customer updated successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/customers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    try {
+      const result = db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+      if (result.changes === 0) return res.status(404).json({ error: "Customer not found" });
+      res.json({ message: "Customer deleted successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // SUPPLIER MODULE ENDPOINTS
+  app.get("/api/suppliers", (req, res) => {
+    try {
+      const rows = db.prepare("SELECT * FROM suppliers ORDER BY name ASC").all();
+      res.json({ suppliers: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/suppliers", (req, res) => {
+    const { name, name_ar, contact_person, phone, email, trn, address, balance } = req.body;
+    if (!name) return res.status(400).json({ error: "Supplier name is required" });
+    try {
+      const existing = db.prepare("SELECT id FROM suppliers WHERE LOWER(name) = LOWER(?)").get(name.trim());
+      if (existing) return res.status(400).json({ error: "Supplier name already exists" });
+
+      const stmt = db.prepare(`INSERT INTO suppliers (name, name_ar, contact_person, phone, email, trn, address, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+      const result = stmt.run(name.trim(), name_ar || "", contact_person || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"));
+      res.status(201).json({ id: result.lastInsertRowid, message: "Supplier created successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/suppliers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const { name, name_ar, contact_person, phone, email, trn, address, balance } = req.body;
+    if (!name) return res.status(400).json({ error: "Supplier name is required" });
+    try {
+      const stmt = db.prepare(`UPDATE suppliers SET name = ?, name_ar = ?, contact_person = ?, phone = ?, email = ?, trn = ?, address = ?, balance = ? WHERE id = ?`);
+      const result = stmt.run(name.trim(), name_ar || "", contact_person || "", phone || "", email || "", trn || "", address || "", parseFloat(balance || "0"), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Supplier not found" });
+      res.json({ message: "Supplier updated successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    try {
+      const result = db.prepare("DELETE FROM suppliers WHERE id = ?").run(id);
+      if (result.changes === 0) return res.status(404).json({ error: "Supplier not found" });
+      res.json({ message: "Supplier deleted successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // INVOICING WORKFLOW WITH STOCK REDUCTION & CREDIT MANAGER
+  app.get("/api/invoices", (req, res) => {
+    try {
+      const rows = db.prepare("SELECT * FROM invoices ORDER BY id DESC").all();
+      res.json({ invoices: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/invoices/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    try {
+      const invoice = db.prepare("SELECT * FROM invoices WHERE id = ?").get(id) as any;
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      
+      const items = db.prepare("SELECT * FROM invoice_items WHERE invoice_id = ?").all(id) as any[];
+      invoice.items = items;
+      
+      res.json(invoice);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/invoices", (req, res) => {
+    const {
+      customer_id,
+      customer_name,
+      customer_trn,
+      date,
+      subtotal,
+      discount,
+      vat_amount,
+      grand_total,
+      payment_status,
+      payment_method,
+      notes,
+      items
+    } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Invoice must contain at least one item." });
+    }
+
+    try {
+      // Create unique serial Invoice Number
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const invoiceCountRow = db.prepare("SELECT count(*) as count FROM invoices WHERE invoice_number LIKE ?").get(`INV-${today}-%`) as any;
+      const sequence = (invoiceCountRow.count + 1).toString().padStart(4, "0");
+      const invoice_number = `INV-${today}-${sequence}`;
+
+      // Insert within robust SQLite Transaction
+      const createInvoiceTx = db.transaction(() => {
+        const invoiceStmt = db.prepare(`INSERT INTO invoices (
+          invoice_number, customer_id, customer_name, customer_trn, date, subtotal, discount, vat_amount, grand_total, payment_status, payment_method, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+        const invoiceResult = invoiceStmt.run(
+          invoice_number,
+          customer_id || null,
+          customer_name || "Cash Customer",
+          customer_trn || "",
+          date || new Date().toISOString().slice(0, 10),
+          parseFloat(subtotal || "0"),
+          parseFloat(discount || "0"),
+          parseFloat(vat_amount || "0"),
+          parseFloat(grand_total || "0"),
+          payment_status || "Paid",
+          payment_method || "Cash",
+          notes || ""
+        );
+
+        const invoiceId = invoiceResult.lastInsertRowid;
+
+        const itemStmt = db.prepare(`INSERT INTO invoice_items (
+          invoice_id, product_id, product_name, sku, barcode, quantity, unit_price, vat_rate, vat_amount, total_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+        const updateStockStmt = db.prepare(`UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?`);
+
+        for (const item of items) {
+          itemStmt.run(
+            invoiceId,
+            item.product_id,
+            item.product_name,
+            item.sku,
+            item.barcode,
+            item.quantity,
+            item.unit_price,
+            item.vat_rate || 5.0,
+            item.vat_amount || 0,
+            item.total_amount || 0
+          );
+
+          // Update stock counts
+          updateStockStmt.run(item.quantity, item.product_id);
+        }
+
+        // Adjust customer credit/balance if they buy on credit
+        if (customer_id && payment_status !== "Paid") {
+          const unpaidAmount = parseFloat(grand_total || "0");
+          const updateCustomerStmt = db.prepare(`UPDATE customers SET balance = balance + ? WHERE id = ?`);
+          updateCustomerStmt.run(unpaidAmount, customer_id);
+        }
+
+        return invoiceId;
+      });
+
+      const invoiceId = createInvoiceTx();
+      res.status(201).json({
+        id: invoiceId,
+        invoice_number,
+        message: "Invoice compiled, stock levels updated, and customer records written."
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/invoices/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    try {
+      const invoice = db.prepare("SELECT * FROM invoices WHERE id = ?").get(id) as any;
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+      const items = db.prepare("SELECT * FROM invoice_items WHERE invoice_id = ?").all(id) as any[];
+
+      const deleteTx = db.transaction(() => {
+        // Revert product stock levels
+        const updateStockStmt = db.prepare("UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?");
+        for (const item of items) {
+          updateStockStmt.run(item.quantity, item.product_id);
+        }
+
+        // Revert customer credit balance
+        if (invoice.customer_id && invoice.payment_status !== "Paid") {
+          const revertBalanceStmt = db.prepare("UPDATE customers SET balance = balance - ? WHERE id = ?");
+          revertBalanceStmt.run(invoice.grand_total, invoice.customer_id);
+        }
+
+        // Delete items and invoice records
+        db.prepare("DELETE FROM invoice_items WHERE invoice_id = ?").run(id);
+        db.prepare("DELETE FROM invoices WHERE id = ?").run(id);
+      });
+
+      deleteTx();
+      res.json({ message: "Invoice removed. Product inventory stock levels and customer balance reverted." });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DIRECT STOCK INVENTORY UPDATER
+  app.put("/api/products/:id/stock", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const { stock_quantity } = req.body;
+    if (stock_quantity === undefined || isNaN(parseInt(stock_quantity, 10))) {
+      return res.status(400).json({ error: "stock_quantity is required and must be an integer" });
+    }
+    try {
+      const stmt = db.prepare("UPDATE products SET stock_quantity = ? WHERE id = ?");
+      const result = stmt.run(parseInt(stock_quantity, 10), id);
+      if (result.changes === 0) return res.status(404).json({ error: "Product not found" });
+      res.json({ stock_quantity, message: "Inventory stock updated successfully." });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

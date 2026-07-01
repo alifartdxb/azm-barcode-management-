@@ -215,7 +215,7 @@ export default function PrintLabels() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-brand-bg print:bg-white print:p-0">
+    <div className="flex flex-col h-full bg-brand-bg print:bg-white print:p-0 print:h-auto print:overflow-visible">
       
       {/* Dynamic Print CSS Style Injection */}
       <style>{`
@@ -248,7 +248,7 @@ export default function PrintLabels() {
         }
       `}</style>
 
-      <div className="flex h-full overflow-hidden">
+      <div className="flex h-full overflow-hidden print:block print:h-auto print:overflow-visible">
         
         {/* SIDE PANEL DESIGNER CONTROLS */}
         <div className="w-[360px] bg-white border-r-2 border-brand-line flex flex-col h-full print:hidden shrink-0">
@@ -845,9 +845,9 @@ export default function PrintLabels() {
         </div>
 
         {/* MAIN LIVE SIMULATOR VIEWPORT */}
-        <div className="flex-1 bg-brand-bg overflow-auto p-4 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible">
+        <div className="flex-1 bg-brand-bg overflow-auto p-4 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible print:block print:h-auto">
           
-          <div className="w-full max-w-4xl border-2 border-brand-line bg-white shadow-[10px_10px_0_rgba(0,0,0,0.1)] print:shadow-none print:border-none print:max-w-none flex flex-col">
+          <div className="w-full max-w-4xl border-2 border-brand-line bg-white shadow-[10px_10px_0_rgba(0,0,0,0.1)] print:shadow-none print:border-none print:max-w-none flex flex-col print:block print:h-auto print:overflow-visible">
             
             <div className="px-3 py-2 border-b border-brand-line font-bold text-[11px] uppercase tracking-wider bg-brand-header text-brand-ink flex justify-between items-center print:hidden">
               <div className="flex items-center gap-1.5">

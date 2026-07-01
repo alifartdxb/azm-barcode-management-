@@ -5,6 +5,7 @@ import {
   AlertTriangle, X, Zap, Check, FileSpreadsheet, ShieldAlert 
 } from 'lucide-react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { Product } from '../types';
 import { validateBarcode, generateLocalEan13 } from '../utils/barcode';
 
@@ -165,7 +166,50 @@ export default function Products() {
     setNewBarcode(generated);
   };
 
-  // Pre-process uploaded CSV before finalizing imports
+  const processRawProducts = (rawProducts: any[]) => {
+    // Analyze and extract stats for the user
+    let blankBarcodes = 0;
+    let dupSkus = 0;
+    let dupBarcodes = 0;
+
+    const csvSkus = new Set<string>();
+    const csvBarcodes = new Set<string>();
+
+    const dbSkuMap = new Set(products.map(p => p.sku.toLowerCase()));
+    const dbBarcodeMap = new Set(products.map(p => p.barcode ? p.barcode.toLowerCase() : '').filter(Boolean));
+
+    rawProducts.forEach((p: any) => {
+      if (!p.sku) return;
+
+      // Check SKU duplicates in payload or database
+      if (csvSkus.has(p.sku.toLowerCase()) || dbSkuMap.has(p.sku.toLowerCase())) {
+        dupSkus++;
+      }
+      csvSkus.add(p.sku.toLowerCase());
+
+      // Barcode audits
+      if (!p.barcode) {
+        blankBarcodes++;
+      } else {
+        if (csvBarcodes.has(p.barcode.toLowerCase()) || dbBarcodeMap.has(p.barcode.toLowerCase())) {
+          dupBarcodes++;
+        }
+        csvBarcodes.add(p.barcode.toLowerCase());
+      }
+    });
+
+    setParsedProducts(rawProducts);
+    setWizardStats({
+      total: rawProducts.length,
+      missingBarcodes: blankBarcodes,
+      duplicateSkus: dupSkus,
+      duplicateBarcodes: dupBarcodes
+    });
+    setIsImportWizardOpen(true);
+    setImporting(false);
+  };
+
+  // Pre-process uploaded CSV or Excel before finalizing imports
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -173,74 +217,84 @@ export default function Products() {
     setImporting(true);
     setMessage(null);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const rawProducts = results.data.map((row: any) => ({
-          sku: (row.sku || row.SKU || '').trim(),
-          barcode: (row.barcode || row.Barcode || '').trim(),
-          name: row.name || row.Name || row['Product Name'] || 'Unknown Product',
-          name_ar: row.name_ar || row['Arabic Name'] || '',
-          brand: row.brand || row.Brand || '',
-          category: row.category || row.Category || '',
-          subcategory: row.subcategory || row.Subcategory || '',
-          unit: row.unit || row.Unit || 'pcs',
-          selling_price: parseFloat(row.selling_price || row['Selling Price'] || '0'),
-          cost_price: parseFloat(row.cost_price || row['Cost Price'] || '0'),
-          vat: parseFloat(row.vat || row.VAT || '0'),
-          supplier: row.supplier || row.Supplier || '',
-          stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || '0', 10),
-          description: row.description || row.Description || '',
-          status: row.status || row.Status || 'Active'
-        }));
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.xlsm');
 
-        // Analyze and extract stats for the user
-        let blankBarcodes = 0;
-        let dupSkus = 0;
-        let dupBarcodes = 0;
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const binaryData = evt.target?.result;
+          const workbook = XLSX.read(binaryData, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-        const csvSkus = new Set<string>();
-        const csvBarcodes = new Set<string>();
+          const rawProducts = jsonData.map((row: any) => {
+            const getVal = (val: any) => (val === undefined || val === null ? '' : String(val).trim());
+            return {
+              sku: getVal(row.sku || row.SKU || ''),
+              barcode: getVal(row.barcode || row.Barcode || ''),
+              name: getVal(row.name || row.Name || row['Product Name'] || 'Unknown Product'),
+              name_ar: getVal(row.name_ar || row['Arabic Name'] || ''),
+              brand: getVal(row.brand || row.Brand || ''),
+              category: getVal(row.category || row.Category || ''),
+              subcategory: getVal(row.subcategory || row.Subcategory || ''),
+              unit: getVal(row.unit || row.Unit || 'pcs'),
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || '0') || 0,
+              supplier: getVal(row.supplier || row.Supplier || ''),
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || '0', 10) || 0,
+              description: getVal(row.description || row.Description || ''),
+              status: getVal(row.status || row.Status || 'Active')
+            };
+          });
 
-        const dbSkuMap = new Set(products.map(p => p.sku.toLowerCase()));
-        const dbBarcodeMap = new Set(products.map(p => p.barcode ? p.barcode.toLowerCase() : '').filter(Boolean));
-
-        rawProducts.forEach((p: any) => {
-          if (!p.sku) return;
-
-          // Check SKU duplicates in payload or database
-          if (csvSkus.has(p.sku.toLowerCase()) || dbSkuMap.has(p.sku.toLowerCase())) {
-            dupSkus++;
-          }
-          csvSkus.add(p.sku.toLowerCase());
-
-          // Barcode audits
-          if (!p.barcode) {
-            blankBarcodes++;
-          } else {
-            if (csvBarcodes.has(p.barcode.toLowerCase()) || dbBarcodeMap.has(p.barcode.toLowerCase())) {
-              dupBarcodes++;
-            }
-            csvBarcodes.add(p.barcode.toLowerCase());
-          }
-        });
-
-        setParsedProducts(rawProducts);
-        setWizardStats({
-          total: rawProducts.length,
-          missingBarcodes: blankBarcodes,
-          duplicateSkus: dupSkus,
-          duplicateBarcodes: dupBarcodes
-        });
-        setIsImportWizardOpen(true);
+          processRawProducts(rawProducts);
+        } catch (err: any) {
+          setMessage({ type: 'error', text: 'Excel Parse error: ' + err.message });
+          setImporting(false);
+        }
+      };
+      reader.onerror = () => {
+        setMessage({ type: 'error', text: 'File reading failed' });
         setImporting(false);
-      },
-      error: (err) => {
-        setMessage({ type: 'error', text: 'CSV Parse error: ' + err.message });
-        setImporting(false);
-      }
-    });
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const rawProducts = results.data.map((row: any) => {
+            const getVal = (val: any) => (val === undefined || val === null ? '' : String(val).trim());
+            return {
+              sku: getVal(row.sku || row.SKU || ''),
+              barcode: getVal(row.barcode || row.Barcode || ''),
+              name: getVal(row.name || row.Name || row['Product Name'] || 'Unknown Product'),
+              name_ar: getVal(row.name_ar || row['Arabic Name'] || ''),
+              brand: getVal(row.brand || row.Brand || ''),
+              category: getVal(row.category || row.Category || ''),
+              subcategory: getVal(row.subcategory || row.Subcategory || ''),
+              unit: getVal(row.unit || row.Unit || 'pcs'),
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || '0') || 0,
+              supplier: getVal(row.supplier || row.Supplier || ''),
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || '0', 10) || 0,
+              description: getVal(row.description || row.Description || ''),
+              status: getVal(row.status || row.Status || 'Active')
+            };
+          });
+
+          processRawProducts(rawProducts);
+        },
+        error: (err) => {
+          setMessage({ type: 'error', text: 'CSV Parse error: ' + err.message });
+          setImporting(false);
+        }
+      });
+    }
   };
 
   // Submit parsed data to back-end with chosen settings

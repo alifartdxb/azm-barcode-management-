@@ -1,5 +1,5 @@
 export interface Product {
-  id: number;
+  id: string | number;
   sku: string;
   barcode: string;
   name: string;
@@ -26,7 +26,7 @@ export interface DashboardStats {
 }
 
 export interface Customer {
-  id: number;
+  id: string | number;
   name: string;
   name_ar?: string;
   phone?: string;
@@ -37,7 +37,7 @@ export interface Customer {
 }
 
 export interface Supplier {
-  id: number;
+  id: string | number;
   name: string;
   name_ar?: string;
   contact_person?: string;
@@ -49,9 +49,9 @@ export interface Supplier {
 }
 
 export interface InvoiceItem {
-  id?: number;
-  invoice_id?: number;
-  product_id: number;
+  id?: string | number;
+  invoice_id?: string | number;
+  product_id: string | number;
   product_name: string;
   sku: string;
   barcode: string;
@@ -63,7 +63,7 @@ export interface InvoiceItem {
 }
 
 export interface Invoice {
-  id: number;
+  id: string | number;
   invoice_number: string;
   customer_id?: number;
   customer_name: string;

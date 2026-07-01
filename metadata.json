@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "AZM Barcode Label Management System",
+  "description": "Fast product identification, barcode label generation, bulk printing, and seamless barcode-based invoice creation for hardware and building materials businesses.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

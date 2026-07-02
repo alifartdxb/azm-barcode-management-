@@ -8,6 +8,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { Product } from '../types';
 import { validateBarcode, generateLocalEan13 } from '../utils/barcode';
+import { localBulkImportProducts } from '../utils/localDb';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -43,10 +44,16 @@ export default function Products() {
     total: 0,
     missingBarcodes: 0,
     duplicateSkus: 0,
-    duplicateBarcodes: 0
+    duplicateBarcodes: 0,
+    skippedRows: 0,
+    emptyRows: 0
   });
   const [overwriteOnImport, setOverwriteOnImport] = useState(true);
   const [generateMissingOnImport, setGenerateMissingOnImport] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{row: number, sku: string, name: string, message: string, severity: 'error' | 'warning'}[]>([]);
+  const [columnMapping, setColumnMapping] = useState<{ [key: string]: string }>({});
 
   const fetchProducts = () => {
     setLoading(true);
@@ -239,44 +246,204 @@ export default function Products() {
     XLSX.writeFile(workbook, `inventory_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const processRawProducts = (rawProducts: any[]) => {
-    // Analyze and extract stats for the user
+  const processRawProducts = (rawProducts: any[], detectedHeaders: string[]) => {
+    // Determine column mapping for user display
+    const mapping: { [key: string]: string } = {};
+    const keyPairs = [
+      { field: 'SKU', keys: ['sku', 'SKU', 'Sku'] },
+      { field: 'Barcode', keys: ['barcode', 'Barcode', 'BarcodeNo'] },
+      { field: 'Product Name', keys: ['name', 'Name', 'product name', 'Product Name', 'title', 'Title'] },
+      { field: 'Brand', keys: ['brand', 'Brand'] },
+      { field: 'Category', keys: ['category', 'Category'] },
+      { field: 'Unit', keys: ['unit', 'Unit'] },
+      { field: 'Selling Price', keys: ['selling_price', 'Selling Price', 'Price', 'Retail Price', 'Selling Price (AED)'] },
+      { field: 'Cost Price', keys: ['cost_price', 'Cost Price', 'Cost Price (AED)'] },
+      { field: 'VAT (%)', keys: ['vat', 'VAT', 'VAT (%)'] },
+      { field: 'Stock Level', keys: ['stock_quantity', 'Stock', 'Quantity', 'Stock Quantity'] },
+      { field: 'Supplier', keys: ['supplier', 'Supplier'] },
+      { field: 'Description', keys: ['description', 'Description'] }
+    ];
+
+    detectedHeaders.forEach(header => {
+      const match = keyPairs.find(p => p.keys.some(k => k.toLowerCase() === header.trim().toLowerCase()));
+      if (match) {
+        mapping[match.field] = header;
+      }
+    });
+    setColumnMapping(mapping);
+
+    // Analyze and extract stats for the user with robust client-side validation
     let blankBarcodes = 0;
     let dupSkus = 0;
     let dupBarcodes = 0;
+    let emptyRows = 0;
 
-    const csvSkus = new Set<string>();
-    const csvBarcodes = new Set<string>();
+    const fileSkus = new Set<string>();
+    const fileBarcodes = new Set<string>();
 
     const dbSkuMap = new Set(products.map(p => p.sku.toLowerCase()));
     const dbBarcodeMap = new Set(products.map(p => p.barcode ? p.barcode.toLowerCase() : '').filter(Boolean));
 
-    rawProducts.forEach((p: any) => {
-      if (!p.sku) return;
+    const errorsList: {row: number, sku: string, name: string, message: string, severity: 'error' | 'warning'}[] = [];
+    const validRows: any[] = [];
 
-      // Check SKU duplicates in payload or database
-      if (csvSkus.has(p.sku.toLowerCase()) || dbSkuMap.has(p.sku.toLowerCase())) {
-        dupSkus++;
+    rawProducts.forEach((p: any, index) => {
+      const rowNum = index + 2; // Row numbers are 1-indexed, first data row is 2 (after header)
+
+      // Ignore truly empty rows
+      if (!p.sku && !p.name && !p.barcode && p.selling_price === 0 && p.stock_quantity === 0) {
+        emptyRows++;
+        return;
       }
-      csvSkus.add(p.sku.toLowerCase());
 
-      // Barcode audits
-      if (!p.barcode) {
-        blankBarcodes++;
+      const cleanSku = String(p.sku || '').trim();
+      const cleanName = String(p.name || '').trim();
+      const cleanBarcode = String(p.barcode || '').trim();
+
+      let hasRowErr = false;
+
+      // 1. Validate SKU
+      if (!cleanSku) {
+        errorsList.push({
+          row: rowNum,
+          sku: 'BLANK',
+          name: cleanName || 'Unknown Product',
+          message: 'Missing SKU: Product must have a unique identifier.',
+          severity: 'error'
+        });
+        hasRowErr = true;
       } else {
-        if (csvBarcodes.has(p.barcode.toLowerCase()) || dbBarcodeMap.has(p.barcode.toLowerCase())) {
-          dupBarcodes++;
+        const lowerSku = cleanSku.toLowerCase();
+        if (fileSkus.has(lowerSku)) {
+          errorsList.push({
+            row: rowNum,
+            sku: cleanSku,
+            name: cleanName,
+            message: `Duplicate SKU: '${cleanSku}' is defined multiple times in this spreadsheet.`,
+            severity: 'error'
+          });
+          hasRowErr = true;
+          dupSkus++;
+        } else {
+          fileSkus.add(lowerSku);
+          if (dbSkuMap.has(lowerSku)) {
+            errorsList.push({
+              row: rowNum,
+              sku: cleanSku,
+              name: cleanName,
+              message: `SKU exists in DB: '${cleanSku}' will overwrite the existing database record.`,
+              severity: 'warning'
+            });
+            dupSkus++;
+          }
         }
-        csvBarcodes.add(p.barcode.toLowerCase());
+      }
+
+      // 2. Validate Product Name
+      if (!cleanName || cleanName.toLowerCase() === 'unknown product') {
+        errorsList.push({
+          row: rowNum,
+          sku: cleanSku || 'N/A',
+          name: 'MISSING',
+          message: 'Missing Product Name: Product title is a required field.',
+          severity: 'error'
+        });
+        hasRowErr = true;
+      }
+
+      // 3. Validate Barcode
+      if (!cleanBarcode) {
+        blankBarcodes++;
+        errorsList.push({
+          row: rowNum,
+          sku: cleanSku || 'N/A',
+          name: cleanName,
+          message: 'Missing Barcode: System will auto-generate an EAN-13 barcode on import.',
+          severity: 'warning'
+        });
+      } else {
+        const lowerBar = cleanBarcode.toLowerCase();
+        if (fileBarcodes.has(lowerBar)) {
+          errorsList.push({
+            row: rowNum,
+            sku: cleanSku || 'N/A',
+            name: cleanName,
+            message: `Duplicate Barcode: '${cleanBarcode}' appears multiple times in this spreadsheet.`,
+            severity: 'error'
+          });
+          hasRowErr = true;
+          dupBarcodes++;
+        } else {
+          fileBarcodes.add(lowerBar);
+          if (dbBarcodeMap.has(lowerBar)) {
+            errorsList.push({
+              row: rowNum,
+              sku: cleanSku || 'N/A',
+              name: cleanName,
+              message: `Barcode exists in DB: '${cleanBarcode}' is already assigned to another item.`,
+              severity: 'warning'
+            });
+            dupBarcodes++;
+          }
+        }
+
+        // Validate barcode format
+        const valRes = validateBarcode(cleanBarcode);
+        if (!valRes.isValid) {
+          errorsList.push({
+            row: rowNum,
+            sku: cleanSku || 'N/A',
+            name: cleanName,
+            message: `Barcode format issue: ${valRes.errorMessage}`,
+            severity: 'warning'
+          });
+        }
+      }
+
+      // 4. Validate Price
+      const sPrice = parseFloat(p.selling_price);
+      if (isNaN(sPrice) || sPrice < 0) {
+        errorsList.push({
+          row: rowNum,
+          sku: cleanSku || 'N/A',
+          name: cleanName,
+          message: `Invalid Price: Selling price '${p.selling_price}' must be a non-negative number.`,
+          severity: 'error'
+        });
+        hasRowErr = true;
+      }
+
+      const cPrice = parseFloat(p.cost_price);
+      if (isNaN(cPrice) || cPrice < 0) {
+        errorsList.push({
+          row: rowNum,
+          sku: cleanSku || 'N/A',
+          name: cleanName,
+          message: `Invalid Cost: Cost price '${p.cost_price}' must be a non-negative number.`,
+          severity: 'warning'
+        });
+      }
+
+      // Only push completely valid rows or warnable rows to the processable queue
+      if (!hasRowErr) {
+        validRows.push({
+          ...p,
+          sku: cleanSku,
+          name: cleanName,
+          barcode: cleanBarcode
+        });
       }
     });
 
-    setParsedProducts(rawProducts);
+    setParsedProducts(validRows);
+    setValidationErrors(errorsList);
     setWizardStats({
       total: rawProducts.length,
       missingBarcodes: blankBarcodes,
       duplicateSkus: dupSkus,
-      duplicateBarcodes: dupBarcodes
+      duplicateBarcodes: dupBarcodes,
+      skippedRows: rawProducts.length - validRows.length - emptyRows,
+      emptyRows
     });
     setIsImportWizardOpen(true);
     setImporting(false);
@@ -296,34 +463,45 @@ export default function Products() {
       const reader = new FileReader();
       reader.onload = (evt) => {
         try {
-          const binaryData = evt.target?.result;
-          const workbook = XLSX.read(binaryData, { type: 'binary' });
+          const arrayBuffer = evt.target?.result as ArrayBuffer;
+          const u8 = new Uint8Array(arrayBuffer);
+          const workbook = XLSX.read(u8, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
+          // Get raw headers from worksheet
+          const headers: string[] = [];
+          if (worksheet['!ref']) {
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+              const cell = worksheet[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+              if (cell && cell.v) headers.push(String(cell.v));
+            }
+          }
+
           const rawProducts = jsonData.map((row: any) => {
             const getVal = (val: any) => (val === undefined || val === null ? '' : String(val).trim());
             return {
-              sku: getVal(row.sku || row.SKU || ''),
-              barcode: getVal(row.barcode || row.Barcode || ''),
-              name: getVal(row.name || row.Name || row['Product Name'] || 'Unknown Product'),
-              name_ar: getVal(row.name_ar || row['Arabic Name'] || ''),
+              sku: getVal(row.sku || row.SKU || row.Sku || ''),
+              barcode: getVal(row.barcode || row.Barcode || row.BarcodeNo || ''),
+              name: getVal(row.name || row.Name || row['Product Name'] || row.product_name || 'Unknown Product'),
+              name_ar: getVal(row.name_ar || row['Arabic Name'] || row.arabic_name || ''),
               brand: getVal(row.brand || row.Brand || ''),
               category: getVal(row.category || row.Category || ''),
               subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
-              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || '0') || 0,
-              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || '0') || 0,
-              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || '0') || 0,
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || row.sellingPrice || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || row.costPrice || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
-              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || '0', 10) || 0,
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
               description: getVal(row.description || row.Description || ''),
               status: getVal(row.status || row.Status || 'Active')
             };
           });
 
-          processRawProducts(rawProducts);
+          processRawProducts(rawProducts, headers);
         } catch (err: any) {
           setMessage({ type: 'error', text: 'Excel Parse error: ' + err.message });
           setImporting(false);
@@ -333,34 +511,35 @@ export default function Products() {
         setMessage({ type: 'error', text: 'File reading failed' });
         setImporting(false);
       };
-      reader.readAsBinaryString(file);
+      reader.readAsArrayBuffer(file);
     } else {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
+          const headers = results.meta.fields || [];
           const rawProducts = results.data.map((row: any) => {
             const getVal = (val: any) => (val === undefined || val === null ? '' : String(val).trim());
             return {
-              sku: getVal(row.sku || row.SKU || ''),
-              barcode: getVal(row.barcode || row.Barcode || ''),
-              name: getVal(row.name || row.Name || row['Product Name'] || 'Unknown Product'),
-              name_ar: getVal(row.name_ar || row['Arabic Name'] || ''),
+              sku: getVal(row.sku || row.SKU || row.Sku || ''),
+              barcode: getVal(row.barcode || row.Barcode || row.BarcodeNo || ''),
+              name: getVal(row.name || row.Name || row['Product Name'] || row.product_name || 'Unknown Product'),
+              name_ar: getVal(row.name_ar || row['Arabic Name'] || row.arabic_name || ''),
               brand: getVal(row.brand || row.Brand || ''),
               category: getVal(row.category || row.Category || ''),
               subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
-              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || '0') || 0,
-              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || '0') || 0,
-              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || '0') || 0,
+              selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || row.sellingPrice || '0') || 0,
+              cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || row.costPrice || '0') || 0,
+              vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
-              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || '0', 10) || 0,
+              stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
               description: getVal(row.description || row.Description || ''),
               status: getVal(row.status || row.Status || 'Active')
             };
           });
 
-          processRawProducts(rawProducts);
+          processRawProducts(rawProducts, headers);
         },
         error: (err) => {
           setMessage({ type: 'error', text: 'CSV Parse error: ' + err.message });
@@ -370,48 +549,85 @@ export default function Products() {
     }
   };
 
-  // Submit parsed data to back-end with chosen settings
-  const executeWizardImport = () => {
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      const mockEvent = {
+        target: {
+          files: [file]
+        }
+      } as unknown as React.ChangeEvent<HTMLInputElement>;
+      handleFileUpload(mockEvent);
+    }
+  };
+
+  // Submit parsed data in batches to keep browser super responsive and show progress
+  const executeWizardImport = async () => {
     setImporting(true);
     setIsImportWizardOpen(false);
+    setImportProgress(0);
 
-    fetch('/api/products/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        products: parsedProducts,
-        overwrite: overwriteOnImport,
-        autoGenerateMissing: generateMissingOnImport
-      })
-    })
-    .then(async res => {
-      const isJson = res.headers.get('content-type')?.includes('application/json');
-      const data = isJson ? await res.json() : null;
-      if (!res.ok) {
-        throw new Error(data?.error || `Server responded with status ${res.status}`);
+    const batchSize = 300;
+    const totalItems = parsedProducts.length;
+    let processedCount = 0;
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    let generated = 0;
+    let skippedDetails: any[] = [];
+
+    try {
+      for (let i = 0; i < totalItems; i += batchSize) {
+        const batch = parsedProducts.slice(i, i + batchSize);
+        const result = await localBulkImportProducts(batch, overwriteOnImport, generateMissingOnImport);
+        
+        processedCount += result.count;
+        inserted += result.inserted;
+        updated += result.updated;
+        skipped += result.skipped;
+        generated += result.generated;
+        if (result.skippedDetails) {
+          skippedDetails = [...skippedDetails, ...result.skippedDetails];
+        }
+
+        // Update progress state
+        const pct = Math.min(100, Math.round((processedCount / totalItems) * 100));
+        setImportProgress(pct);
+
+        // Yield to the main thread to ensure smooth UI animation
+        await new Promise(resolve => setTimeout(resolve, 25));
       }
-      return data;
-    })
-    .then(data => {
-      let statsText = `Successfully processed ${data.count} items.`;
-      if (data.inserted > 0) statsText += ` Added: ${data.inserted}.`;
-      if (data.updated > 0) statsText += ` Overwritten: ${data.updated}.`;
-      if (data.generated > 0) statsText += ` Barcodes Auto-Generated: ${data.generated}.`;
-      if (data.skipped > 0) statsText += ` Skipped: ${data.skipped}.`;
+
+      let statsText = `Successfully processed ${totalItems} items.`;
+      if (inserted > 0) statsText += ` Added: ${inserted}.`;
+      if (updated > 0) statsText += ` Overwritten: ${updated}.`;
+      if (generated > 0) statsText += ` Barcodes Auto-Generated: ${generated}.`;
+      if (skipped > 0) statsText += ` Skipped: ${skipped}.`;
 
       setMessage({ 
         type: 'success', 
         text: statsText 
       });
       fetchProducts();
-    })
-    .catch(err => {
+    } catch (err: any) {
       setMessage({ type: 'error', text: 'Import failed: ' + err.message });
-    })
-    .finally(() => {
+    } finally {
       setImporting(false);
+      setImportProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-    });
+    }
   };
 
   // Quick Action: Fix all blank barcodes for existing records
@@ -472,7 +688,37 @@ export default function Products() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-brand-bg relative">
+    <div 
+      className="flex flex-col h-full bg-brand-bg relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 bg-brand-ink/90 border-4 border-dashed border-brand-accent z-50 flex flex-col items-center justify-center p-6 text-white animate-in fade-in duration-100">
+          <Upload className="w-16 h-16 text-brand-accent animate-bounce mb-4" />
+          <span className="font-bold uppercase tracking-wider text-lg">Drop your CSV or Excel file here</span>
+          <p className="text-xs opacity-80 mt-1 font-mono">Process product lists completely in-browser with secure local indexing</p>
+        </div>
+      )}
+
+      {importProgress !== null && (
+        <div className="absolute inset-0 bg-[#00000075] backdrop-blur-xs z-50 flex flex-col items-center justify-center p-6">
+          <div className="bg-white border-2 border-brand-line p-6 w-full max-w-md shadow-[10px_10px_0_rgba(0,0,0,0.15)] text-center flex flex-col gap-4">
+            <RefreshCw className="w-8 h-8 text-brand-accent animate-spin mx-auto" />
+            <span className="font-bold uppercase tracking-wider text-xs text-brand-ink">Client-Side High Performance Importing...</span>
+            <div className="w-full bg-gray-100 border border-brand-line h-4 overflow-hidden relative">
+              <div 
+                className="bg-brand-accent h-full transition-all duration-150 ease-out" 
+                style={{ width: `${importProgress}%` }}
+              />
+            </div>
+            <span className="font-mono font-bold text-sm text-brand-accent">{importProgress}% Completed</span>
+            <p className="text-[10px] text-gray-500">Writing items asynchronously to client IndexedDB relational engine...</p>
+          </div>
+        </div>
+      )}
+
       <div className="m-2 flex flex-wrap gap-2 items-center justify-between shrink-0">
         <div className="flex gap-3 items-center w-full max-w-md">
           <div className="relative flex-1 border border-brand-line bg-white">
@@ -853,96 +1099,176 @@ export default function Products() {
       {/* CSV IMPORT WIZARD / AUDIT DIALOG */}
       {isImportWizardOpen && (
         <div className="absolute inset-0 bg-[#00000050] backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-brand-line w-full max-w-xl shadow-[10px_10px_0_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white border-2 border-brand-line w-full max-w-2xl shadow-[10px_10px_0_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-150">
             
-            <div className="px-3 py-2 border-b-2 border-brand-line font-bold text-xs uppercase tracking-wider bg-brand-header text-brand-ink flex justify-between items-center">
+            <div className="px-3 py-2 border-b-2 border-brand-line font-bold text-xs uppercase tracking-wider bg-brand-header text-brand-ink flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-brand-accent" />
-                <span>CSV File Pre-Import Audit & Validation</span>
+                <span>CSV / Excel Pre-Import Advanced Audit & Validation</span>
               </div>
               <button onClick={() => setIsImportWizardOpen(false)} className="hover:text-red-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 overflow-auto flex flex-col gap-4 text-xs">
+            <div className="p-4 overflow-y-auto flex flex-col gap-4 text-xs">
               
               {/* Audit Stats Bento */}
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="bg-brand-sidebar border border-brand-line p-2">
-                  <div className="text-[9px] uppercase tracking-wider opacity-60">Total Rows</div>
-                  <div className="font-mono text-lg font-black">{wizardStats.total}</div>
+              <div className="grid grid-cols-5 gap-2 text-center shrink-0">
+                <div className="bg-brand-sidebar border border-brand-line p-1.5">
+                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold">Total Rows</div>
+                  <div className="font-mono text-base font-black text-brand-ink">{wizardStats.total}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-2">
-                  <div className="text-[9px] uppercase tracking-wider opacity-60">Missing Barcodes</div>
-                  <div className="font-mono text-lg font-black text-amber-600">{wizardStats.missingBarcodes}</div>
+                <div className="bg-brand-sidebar border border-brand-line p-1.5">
+                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-green-700">Ready</div>
+                  <div className="font-mono text-base font-black text-green-600">{parsedProducts.length}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-2">
-                  <div className="text-[9px] uppercase tracking-wider opacity-60">Duplicate SKUs</div>
-                  <div className="font-mono text-lg font-black text-red-600">{wizardStats.duplicateSkus}</div>
+                <div className="bg-brand-sidebar border border-brand-line p-1.5">
+                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-red-700">Skipped (Err)</div>
+                  <div className="font-mono text-base font-black text-red-600">{wizardStats.skippedRows}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-2">
-                  <div className="text-[9px] uppercase tracking-wider opacity-60">Dup Barcodes</div>
-                  <div className="font-mono text-lg font-black text-red-600">{wizardStats.duplicateBarcodes}</div>
+                <div className="bg-brand-sidebar border border-brand-line p-1.5">
+                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold">Empty</div>
+                  <div className="font-mono text-base font-black text-gray-500">{wizardStats.emptyRows}</div>
+                </div>
+                <div className="bg-brand-sidebar border border-brand-line p-1.5">
+                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-amber-700">No Barcode</div>
+                  <div className="font-mono text-base font-black text-amber-600">{wizardStats.missingBarcodes}</div>
+                </div>
+              </div>
+
+              {/* Column Mapping Details */}
+              <div className="border border-brand-line p-2.5 bg-brand-bg shrink-0">
+                <span className="block font-bold uppercase text-[9px] mb-1 opacity-75">Mapped Fields / Headers:</span>
+                <div className="flex flex-wrap gap-1.5 text-[9px]">
+                  {Object.entries(columnMapping).map(([field, fileHeader]) => (
+                    <span key={field} className="bg-white border border-brand-line px-1.5 py-0.5 rounded font-mono">
+                      <strong className="text-brand-accent">{field}</strong> → <span className="opacity-70">{fileHeader}</span>
+                    </span>
+                  ))}
+                  {Object.keys(columnMapping).length === 0 && (
+                    <span className="text-red-500 italic">No columns mapped. Please ensure SKU and Product Name are specified!</span>
+                  )}
                 </div>
               </div>
 
               {/* Duplicate/Generation Settings Panel */}
-              <div className="border border-brand-line p-3 bg-brand-sidebar flex flex-col gap-2">
+              <div className="border border-brand-line p-3 bg-brand-sidebar flex flex-col gap-2 shrink-0">
                 <span className="font-bold uppercase text-[10px] text-brand-ink">Conflict & Auto-Generation Options:</span>
                 
-                <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
-                  <input 
-                    type="checkbox"
-                    checked={overwriteOnImport}
-                    onChange={(e) => setOverwriteOnImport(e.target.checked)}
-                    className="mt-0.5 accent-brand-ink"
-                  />
-                  <div>
-                    <span className="font-bold">Overwrite existing items matching SKU</span>
-                    <p className="text-[10px] opacity-70">If disabled, records with pre-existing SKUs in the DB will be ignored.</p>
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
-                  <input 
-                    type="checkbox"
-                    checked={generateMissingOnImport}
-                    onChange={(e) => setGenerateMissingOnImport(e.target.checked)}
-                    className="mt-0.5 accent-brand-ink"
-                  />
-                  <div>
-                    <span className="font-bold">Auto-generate EAN-13 barcodes for missing/duplicate values</span>
-                    <p className="text-[10px] opacity-70">Uses compliant GS1-like '201' private retail check-digit structure.</p>
-                  </div>
-                </label>
-              </div>
-
-              {/* Sample Preview list */}
-              <div>
-                <span className="block font-bold uppercase text-[10px] mb-1.5 opacity-70">Audit Preview (First 4 rows):</span>
-                <div className="border border-brand-line bg-white">
-                  <div className="grid grid-cols-[100px_1fr_120px] bg-brand-header border-b border-brand-line font-bold text-[9px] p-1 uppercase">
-                    <div>SKU</div>
-                    <div>Product Name</div>
-                    <div>Parsed Barcode</div>
-                  </div>
-                  {parsedProducts.slice(0, 4).map((p, i) => (
-                    <div key={i} className="grid grid-cols-[100px_1fr_120px] p-1 border-b border-gray-100 last:border-0 font-mono text-[10px]">
-                      <div className="truncate font-bold">{p.sku || <span className="text-red-600">BLANK</span>}</div>
-                      <div className="truncate font-sans font-medium">{p.name}</div>
-                      <div className="truncate text-gray-500">
-                        {p.barcode ? p.barcode : <span className="text-amber-600 font-bold font-sans text-[9px] uppercase">Auto-Generate</span>}
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
+                    <input 
+                      type="checkbox"
+                      checked={overwriteOnImport}
+                      onChange={(e) => setOverwriteOnImport(e.target.checked)}
+                      className="mt-0.5 accent-brand-ink"
+                    />
+                    <div>
+                      <span className="font-bold">Overwrite matching SKU</span>
+                      <p className="text-[9px] opacity-70">If checked, records with existing SKUs in the DB will be updated.</p>
                     </div>
-                  ))}
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
+                    <input 
+                      type="checkbox"
+                      checked={generateMissingOnImport}
+                      onChange={(e) => setGenerateMissingOnImport(e.target.checked)}
+                      className="mt-0.5 accent-brand-ink"
+                    />
+                    <div>
+                      <span className="font-bold">Auto-generate Barcodes</span>
+                      <p className="text-[9px] opacity-70">Generates unique EAN-13 barcodes for blank or duplicate barcode values.</p>
+                    </div>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex gap-2.5 pt-2">
+              {/* Validation Results Table */}
+              {validationErrors.length > 0 && (
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold uppercase text-[10px] opacity-70 flex items-center gap-1 text-brand-ink">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      Validation Warnings & Errors ({validationErrors.length})
+                    </span>
+                  </div>
+                  <div className="border border-brand-line bg-white max-h-[140px] overflow-y-auto font-mono text-[9px]">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-brand-sidebar border-b border-brand-line text-[8px] font-bold uppercase sticky top-0 z-10">
+                          <th className="p-1 border-r border-brand-line w-[45px]">Row</th>
+                          <th className="p-1 border-r border-brand-line w-[80px]">SKU</th>
+                          <th className="p-1 border-r border-brand-line w-[100px] truncate">Product Name</th>
+                          <th className="p-1">Validation Audit Message</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {validationErrors.map((err, i) => (
+                          <tr key={i} className={`border-b border-gray-100 last:border-0 ${err.severity === 'error' ? 'bg-red-50/75 text-red-900' : 'bg-amber-50/75 text-amber-900'}`}>
+                            <td className="p-1 border-r border-brand-line text-center font-bold">#{err.row}</td>
+                            <td className="p-1 border-r border-brand-line font-bold truncate">{err.sku}</td>
+                            <td className="p-1 border-r border-brand-line truncate font-sans font-medium">{err.name}</td>
+                            <td className="p-1 font-sans font-medium flex items-center gap-1 flex-wrap">
+                              <span className={`px-1 rounded-[2px] font-bold text-[8px] uppercase text-white ${err.severity === 'error' ? 'bg-red-600' : 'bg-amber-600'}`}>
+                                {err.severity}
+                              </span>
+                              <span>{err.message}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Data Preview Table (First 50 Rows) */}
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <span className="block font-bold uppercase text-[10px] opacity-70">
+                  Data Audit Preview ({Math.min(50, parsedProducts.length)} of {parsedProducts.length} processable rows):
+                </span>
+                <div className="border border-brand-line bg-white max-h-[160px] overflow-y-auto font-mono text-[9px]">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-brand-header border-b border-brand-line text-[8px] font-bold uppercase sticky top-0 z-10">
+                        <th className="p-1 border-r border-brand-line w-[80px]">SKU</th>
+                        <th className="p-1 border-r border-brand-line">Product Name</th>
+                        <th className="p-1 border-r border-brand-line w-[90px]">Barcode</th>
+                        <th className="p-1 border-r border-brand-line w-[65px] text-right">Price</th>
+                        <th className="p-1 w-[50px] text-right">Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedProducts.slice(0, 50).map((p, i) => (
+                        <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                          <td className="p-1 border-r border-brand-line font-bold truncate">{p.sku}</td>
+                          <td className="p-1 border-r border-brand-line font-sans font-medium truncate max-w-[200px]">{p.name}</td>
+                          <td className="p-1 border-r border-brand-line truncate">
+                            {p.barcode ? p.barcode : <span className="text-amber-600 font-bold font-sans text-[8px] uppercase">Auto-Gen</span>}
+                          </td>
+                          <td className="p-1 border-r border-brand-line text-right font-bold text-gray-700">${parseFloat(p.selling_price || '0').toFixed(2)}</td>
+                          <td className="p-1 text-right text-gray-600">{p.stock_quantity}</td>
+                        </tr>
+                      ))}
+                      {parsedProducts.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-red-500 font-sans font-bold uppercase">
+                            No processable records. Please fix the validation errors above to import.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex gap-2.5 pt-2 shrink-0">
                 <button 
                   onClick={executeWizardImport}
-                  className="flex-1 bg-brand-accent text-white border border-brand-line py-2.5 text-xs uppercase font-bold cursor-pointer hover:opacity-95"
+                  disabled={parsedProducts.length === 0}
+                  className="flex-1 bg-brand-accent text-white border border-brand-line py-2.5 text-xs uppercase font-bold cursor-pointer hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm and Run Import
                 </button>

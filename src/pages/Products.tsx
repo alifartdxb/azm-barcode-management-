@@ -9,6 +9,13 @@ import * as XLSX from 'xlsx';
 import { Product } from '../types';
 import { validateBarcode, generateLocalEan13 } from '../utils/barcode';
 import { ProductService } from '../services/ProductService';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { Card, CardContent } from '../components/ui/card';
+import { 
+  Table, TableHeader, TableRow, TableHead, TableBody, TableCell 
+} from '../components/ui/table';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -685,27 +692,31 @@ export default function Products() {
         </div>
       )}
 
-      <div className="m-2 flex flex-wrap gap-2 items-center justify-between shrink-0">
-        <div className="flex gap-3 items-center w-full max-w-md">
-          <div className="relative flex-1 border border-brand-line bg-white">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-brand-ink opacity-50" />
-            <input 
-              type="text"
-              placeholder="Search by SKU, Barcode, or Name..."
+      <div className="flex flex-wrap gap-4 items-center justify-between shrink-0 p-6 border-b bg-card">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight">Inventory & Products</h1>
+          <p className="text-sm text-muted-foreground">Manage your product catalog, import bulk data, and view stock levels.</p>
+        </div>
+        
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="relative max-w-sm mr-2">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input 
+              type="search"
+              placeholder="Search by SKU, Barcode, Name..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 text-sm outline-none bg-transparent"
+              className="pl-9 w-64 bg-background"
             />
           </div>
-        </div>
-        <div className="flex gap-2 shrink-0 flex-wrap">
-          <button 
+
+          <Button 
             onClick={() => setIsAddOpen(true)}
-            className="bg-brand-ink text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:bg-opacity-90 flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            + Add Product
-          </button>
+            Add Product
+          </Button>
           
           <input
             type="file"
@@ -714,47 +725,52 @@ export default function Products() {
             className="hidden"
             onChange={handleFileUpload}
           />
-          <button 
+          <Button 
+            variant="secondary"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="bg-brand-accent text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
             {importing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            + Import Excel/CSV
-          </button>
+            Import Data
+          </Button>
 
-          <button 
+          <Button 
+            variant="outline"
             onClick={handleExportExcel}
-            className="bg-[#217346] text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
             <FileSpreadsheet className="w-4 h-4" />
             Export Excel
-          </button>
+          </Button>
 
-          <button 
+          <Button 
+            variant="outline"
             onClick={handleExportCSV}
-            className="bg-brand-ink text-white border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:opacity-90 flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
             <FileSpreadsheet className="w-4 h-4" />
             Export CSV
-          </button>
+          </Button>
 
-          <button 
+          <Button 
+            variant="outline"
             onClick={handleBulkGenerateBarcodes}
             title="Auto-Generate barcodes for all existing products lacking a barcode"
-            className="bg-white text-brand-ink border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:bg-gray-100 flex items-center gap-1.5"
+            className="flex items-center gap-2 text-yellow-600 border-yellow-200 hover:bg-yellow-50 dark:border-yellow-900/50 dark:hover:bg-yellow-900/20"
           >
-            <Zap className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+            <Zap className="w-4 h-4 fill-current" />
             Auto Barcodes
-          </button>
+          </Button>
 
-          <button 
+          <Button 
+            variant="destructive"
             onClick={handleClearAll} 
-            className="bg-white text-red-600 border border-brand-line px-4 py-1.5 text-xs font-bold uppercase cursor-pointer hover:bg-gray-100 flex items-center gap-1.5"
+            className="flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" />
             Clear Data
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -774,73 +790,94 @@ export default function Products() {
       )}
 
       {/* Product List Table Layout */}
-      <div className="border border-brand-line m-2 mt-0 bg-white flex-1 flex flex-col overflow-hidden">
-        <div className="px-3 py-2 border-b border-brand-line font-bold text-[12px] uppercase tracking-wider flex justify-between items-center bg-brand-header text-brand-ink shrink-0">
-          <span>Product Explorer Database</span>
-          <span className="text-[10px] font-normal normal-case opacity-70">Showing {filteredProducts.length} items</span>
-        </div>
+      <div className="flex-1 overflow-auto p-6">
+        <Card>
+          <div className="px-6 py-4 border-b flex justify-between items-center bg-card">
+            <h3 className="font-semibold text-lg">Product Explorer Database</h3>
+            <Badge variant="outline" className="font-normal text-muted-foreground">Showing {filteredProducts.length} items</Badge>
+          </div>
 
-        <div className="grid grid-cols-[100px_2fr_1fr_120px_100px_80px] bg-brand-sidebar border-b border-brand-line shrink-0 font-bold">
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5">SKU</div>
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5 border-l border-brand-line">Product Name</div>
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5 border-l border-brand-line">Category</div>
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5 border-l border-brand-line">Barcode & Validation</div>
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5 text-right border-l border-brand-line">Price</div>
-          <div className="font-serif italic text-[10px] text-gray-600 px-2 py-1.5 text-right border-l border-brand-line">Stock</div>
-        </div>
-
-        <div className="flex-1 overflow-auto bg-brand-bg">
-          {loading ? (
-            <div className="p-8 text-center text-[11px] opacity-60 flex flex-col items-center justify-center gap-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-brand-ink opacity-40" />
-              <span>Fetching secure SQLite index...</span>
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="p-12 text-center text-[11px] opacity-60 flex flex-col items-center gap-2 bg-white m-4 border border-dashed border-[#ccc]">
-              <AlertTriangle className="w-8 h-8 text-yellow-500" />
-              <span className="font-bold uppercase tracking-wider text-xs">No records on file</span>
-              <span>Import a CSV spreadsheet or click "+ Add Product" to get started.</span>
-            </div>
-          ) : (
-            filteredProducts.map(p => {
-              const val = p.barcode ? validateBarcode(p.barcode) : null;
-              return (
-                <div key={p.id} className="grid grid-cols-[100px_2fr_1fr_120px_100px_80px] text-[11px] border-b border-[#ddd] items-center min-h-[36px] py-1 px-0 cursor-pointer hover:bg-brand-ink hover:text-white transition-colors">
-                  <div className="px-2 truncate font-bold font-mono">{p.sku}</div>
-                  <div className="px-2 font-bold truncate">
-                    <span>{p.name}</span>
-                    {p.name_ar && <span className="block text-[9px] opacity-70 font-normal mt-0.5">{p.name_ar}</span>}
-                  </div>
-                  <div className="px-2 truncate font-serif italic text-gray-600 hover:text-white">{p.category || '-'}</div>
-                  <div className="px-2 font-mono flex flex-col gap-0.5 shrink-0">
-                    {p.barcode ? (
-                      <>
-                        <span className="font-bold tracking-tight">{p.barcode}</span>
-                        {val && val.isValid ? (
-                          <span className="text-[8px] bg-green-100 text-green-800 border border-green-300 font-sans uppercase tracking-widest px-1 py-0.2 rounded w-fit scale-90 -ml-1">
-                            {val.type} ✓
-                          </span>
-                        ) : (
-                          <span className="text-[8px] bg-red-100 text-red-800 border border-red-300 font-sans uppercase tracking-widest px-1 py-0.2 rounded w-fit scale-90 -ml-1" title={val?.errorMessage}>
-                            INVALID
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-red-500 font-bold uppercase text-[9px]">Missing Barcode</span>
-                    )}
-                  </div>
-                  <div className="px-2 text-right font-bold text-[11px] font-mono">${p.selling_price.toFixed(2)}</div>
-                  <div className="px-2 text-right">
-                    <span className={`px-1.5 py-0.5 text-[9px] font-mono ${p.stock_quantity > 10 ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300 font-bold'}`}>
-                      {p.stock_quantity}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[120px]">SKU</TableHead>
+                <TableHead>Product Name</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="w-[180px]">Barcode & Validation</TableHead>
+                <TableHead className="text-right w-[120px]">Price</TableHead>
+                <TableHead className="text-right w-[100px]">Stock</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-64 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin" />
+                      <span>Fetching secure SQLite index...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-64 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                      <AlertTriangle className="w-10 h-10 text-yellow-500" />
+                      <span className="font-medium text-foreground">No records on file</span>
+                      <span className="text-sm">Import a CSV spreadsheet or click "Add Product" to get started.</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProducts.map(p => {
+                  const val = p.barcode ? validateBarcode(p.barcode) : null;
+                  return (
+                    <TableRow key={p.id} className="cursor-pointer transition-colors hover:bg-muted/50">
+                      <TableCell className="font-medium font-mono text-xs">{p.sku}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{p.name}</span>
+                          {p.name_ar && <span className="text-xs text-muted-foreground mt-0.5">{p.name_ar}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.category || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          {p.barcode ? (
+                            <>
+                              <span className="font-mono text-xs font-medium">{p.barcode}</span>
+                              {val && val.isValid ? (
+                                <Badge variant="success" className="text-[10px] px-1.5 py-0 uppercase w-fit scale-90 -ml-1">
+                                  {val.type} ✓
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase w-fit scale-90 -ml-1" title={val?.errorMessage}>
+                                  INVALID
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">
+                              Missing Barcode
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium text-sm">
+                        ${p.selling_price.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={p.stock_quantity > 10 ? 'success' : 'destructive'} className="font-mono text-xs">
+                          {p.stock_quantity}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
       </div>
 
       {/* SIDE DRAWER: Manual Add Product Form */}

@@ -7,6 +7,9 @@ import {
 import { Product, Customer, Invoice, InvoiceItem } from '../types';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { ProductService } from '../services/ProductService';
+import { CustomerService } from '../services/CustomerService';
+import { InvoiceService } from '../services/InvoiceService';
 
 export default function Billing() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,18 +58,18 @@ export default function Billing() {
     setLoading(true);
     try {
       const [prodsRes, custsRes, invsRes] = await Promise.all([
-        fetch('/api/products').then(res => res.json()),
-        fetch('/api/customers').then(res => res.json()),
-        fetch('/api/invoices').then(res => res.json())
+        ProductService.getAll(),
+        CustomerService.getAll(),
+        InvoiceService.getAll()
       ]);
 
-      setProducts(prodsRes.products || []);
-      setCustomers(custsRes.customers || []);
-      setInvoices(invsRes.invoices || []);
+      setProducts(prodsRes || []);
+      setCustomers(custsRes || []);
+      setInvoices(invsRes || []);
 
       // Default to "Cash Customer" if found
-      const cashCust = (custsRes.customers || []).find((c: any) => c.name.toLowerCase().includes('cash'));
-      if (cashCust) {
+      const cashCust = (custsRes || []).find((c: any) => c.name.toLowerCase().includes('cash'));
+      if (cashCust && cashCust.id !== undefined) {
         setSelectedCustomerId(cashCust.id);
       }
     } catch (err) {
@@ -151,32 +154,25 @@ export default function Billing() {
     }
 
     try {
-      const res = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newCustName.trim(),
-          name_ar: newCustNameAr.trim(),
-          phone: newCustPhone.trim(),
-          trn: newCustTrn.trim(),
-          address: newCustAddress.trim(),
-          balance: 0
-        })
+      await CustomerService.save({
+        name: newCustName.trim(),
+        name_ar: newCustNameAr.trim(),
+        phone: newCustPhone.trim(),
+        trn: newCustTrn.trim(),
+        address: newCustAddress.trim(),
+        balance: 0
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setCustModalError(data.error || 'Failed to register customer');
-        return;
-      }
-
       // Reload Customers list
-      const updatedRes = await fetch('/api/customers').then(res => res.json());
-      const updatedCusts = updatedRes.customers || [];
+      const updatedCusts = await CustomerService.getAll();
       setCustomers(updatedCusts);
       
+      const newCust = updatedCusts.find(c => c.name === newCustName.trim());
+      
       // Auto select the newly created customer
-      setSelectedCustomerId(data.id);
+      if (newCust && newCust.id !== undefined) {
+         setSelectedCustomerId(newCust.id);
+      }
       
       // Reset & Hide Modal
       setNewCustName('');
@@ -244,20 +240,10 @@ export default function Billing() {
     };
 
     try {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        alert('Checkout Failed: ' + data.error);
-        return;
-      }
+      const savedInvoice = await InvoiceService.save(payload);
 
       // Success
-      alert(`Invoice created successfully! Number: ${data.invoice_number}`);
+      alert(`Invoice created successfully! Number: ${savedInvoice.invoice_number}`);
       
       // Clear cart & state
       setCart([]);
@@ -269,7 +255,9 @@ export default function Billing() {
       loadData();
       
       // Fetch details of newly compiled invoice to auto show printing modal
-      fetchInvoiceDetails(data.id);
+      if (savedInvoice.id !== undefined) {
+         fetchInvoiceDetails(savedInvoice.id);
+      }
     } catch (err) {
       console.error('Checkout error:', err);
       alert('Network Error during invoice processing.');
@@ -278,9 +266,8 @@ export default function Billing() {
 
   const fetchInvoiceDetails = async (id: number) => {
     try {
-      const res = await fetch(`/api/invoices/${id}`);
-      const data = await res.json();
-      if (res.ok) {
+      const data = await InvoiceService.getById(id);
+      if (data) {
         setSelectedInvoice(data);
         setSelectedInvoiceItems(data.items || []);
       }
@@ -292,21 +279,18 @@ export default function Billing() {
   const handleDeleteInvoice = async (id: number) => {
     if (!confirm('Are you absolutely sure you want to void this invoice? This will restore product stock levels and revert customer outstanding balances.')) return;
     try {
-      const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.message);
-        loadData();
-        if (selectedInvoice && selectedInvoice.id === id) {
-          setSelectedInvoice(null);
-        }
-      } else {
-        alert(data.error || 'Failed to delete invoice');
+      await InvoiceService.delete(id);
+      alert('Invoice deleted successfully');
+      loadData();
+      if (selectedInvoice && selectedInvoice.id === id) {
+        setSelectedInvoice(null);
       }
     } catch (err) {
       console.error('Error deleting invoice:', err);
+      alert('Failed to delete invoice');
     }
   };
+
 
   const handleExportSalesReportCSV = () => {
     if (invoices.length === 0) {

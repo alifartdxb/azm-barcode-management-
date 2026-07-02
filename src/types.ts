@@ -1,5 +1,5 @@
 export interface Product {
-  id: number;
+  id?: number;
   sku: string;
   barcode: string;
   name: string;
@@ -8,13 +8,133 @@ export interface Product {
   category?: string;
   subcategory?: string;
   unit?: string;
+  cost_price: number;
   selling_price: number;
-  cost_price?: number;
-  vat?: number;
+  vat: number;
   supplier?: string;
+  warehouse_location?: string;
+  minimum_stock?: number;
   stock_quantity: number;
   description?: string;
-  status: string;
+  status: string; // 'Active', 'Inactive'
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Customer {
+  id?: number;
+  name: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  trn?: string;
+  address?: string;
+  credit_limit?: number;
+  balance: number;
+  created_at?: string;
+}
+
+export interface Supplier {
+  id?: number;
+  name: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  trn?: string;
+  address?: string;
+  balance: number;
+  created_at?: string;
+}
+
+export interface InvoiceItem {
+  product_id: number;
+  sku: string;
+  barcode: string;
+  name: string; // Add this since some code references product_name, wait, old code says product_name and vat_rate, total_amount.
+  product_name?: string;
+  quantity: number;
+  unit_price: number;
+  vat_rate?: number;
+  vat_percentage?: number;
+  vat_amount?: number;
+  total_amount?: number;
+  total?: number;
+}
+
+export interface Invoice {
+  id?: number;
+  invoice_number: string;
+  customer_id?: number;
+  customer_name?: string;
+  customer_trn?: string;
+  date?: string;
+  created_at?: string;
+  total_amount?: number;
+  subtotal?: number;
+  discount?: number;
+  discount_amount?: number;
+  vat_amount: number;
+  grand_total: number;
+  payment_method: string;
+  payment_status?: string;
+  status?: string;
+  notes?: string;
+  items: InvoiceItem[];
+}
+
+export interface Quotation {
+  id?: number;
+  quotation_number: string;
+  customer_id?: number;
+  customer_name?: string;
+  total_amount: number;
+  vat_amount: number;
+  discount_amount: number;
+  grand_total: number;
+  status: string; // 'Draft', 'Sent', 'Accepted', 'Rejected'
+  created_at: string;
+  notes?: string;
+  terms?: string;
+  items: InvoiceItem[];
+}
+
+export interface PurchaseOrder {
+  id?: number;
+  po_number: string;
+  supplier_id: number;
+  supplier_name: string;
+  total_amount: number;
+  status: string; // 'Pending', 'Received', 'Cancelled', 'Partial'
+  created_at: string;
+  expected_date?: string;
+  items: InvoiceItem[];
+}
+
+export interface InventoryHistory {
+  id?: number;
+  product_id: number;
+  type: string; // 'IN', 'OUT', 'ADJUST', 'TRANSFER', 'DAMAGE', 'RETURN'
+  quantity: number;
+  reference_id?: number; // invoice_id, po_id, etc.
+  reference_type?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface AppSettings {
+  id: number; // Always 1
+  company_name: string;
+  company_trn?: string;
+  company_address?: string;
+  company_phone?: string;
+  company_email?: string;
+  invoice_prefix: string;
+  quotation_prefix: string;
+  currency: string;
+  default_vat: number;
+  label_size: string; // e.g., '38x21', '50x25'
+  theme: string;
 }
 
 export interface DashboardStats {
@@ -23,58 +143,4 @@ export interface DashboardStats {
   lowStock: number;
   totalSales?: number;
   totalInvoices?: number;
-}
-
-export interface Customer {
-  id: number;
-  name: string;
-  name_ar?: string;
-  phone?: string;
-  email?: string;
-  trn?: string; // Tax Registration Number for VAT invoices in UAE
-  address?: string;
-  balance: number;
-}
-
-export interface Supplier {
-  id: number;
-  name: string;
-  name_ar?: string;
-  contact_person?: string;
-  phone?: string;
-  email?: string;
-  trn?: string;
-  address?: string;
-  balance: number;
-}
-
-export interface InvoiceItem {
-  id?: number;
-  invoice_id?: number;
-  product_id: number;
-  product_name: string;
-  sku: string;
-  barcode: string;
-  quantity: number;
-  unit_price: number;
-  vat_rate: number; // e.g. 5 for 5%
-  vat_amount: number;
-  total_amount: number;
-}
-
-export interface Invoice {
-  id: number;
-  invoice_number: string;
-  customer_id?: number;
-  customer_name: string;
-  customer_trn?: string;
-  date: string;
-  subtotal: number;
-  discount: number;
-  vat_amount: number;
-  grand_total: number;
-  payment_status: 'Paid' | 'Unpaid' | 'Partial';
-  payment_method: 'Cash' | 'Card' | 'Bank Transfer';
-  notes?: string;
-  items?: InvoiceItem[];
 }

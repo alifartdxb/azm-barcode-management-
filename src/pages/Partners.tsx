@@ -4,6 +4,8 @@ import {
   MapPin, Plus, Trash2, Edit, AlertCircle, RefreshCw, X, CircleDollarSign
 } from 'lucide-react';
 import { Customer, Supplier } from '../types';
+import { CustomerService } from '../services/CustomerService';
+import { SupplierService } from '../services/SupplierService';
 
 export default function Partners() {
   const [activeTab, setActiveTab] = useState<'customers' | 'suppliers'>('customers');
@@ -33,11 +35,11 @@ export default function Partners() {
     setLoading(true);
     try {
       const [custsRes, supsRes] = await Promise.all([
-        fetch('/api/customers').then(res => res.json()),
-        fetch('/api/suppliers').then(res => res.json())
+        CustomerService.getAll(),
+        SupplierService.getAll()
       ]);
-      setCustomers(custsRes.customers || []);
-      setSuppliers(supsRes.suppliers || []);
+      setCustomers(custsRes || []);
+      setSuppliers(supsRes || []);
     } catch (err) {
       console.error('Error fetching partner lists:', err);
     } finally {
@@ -81,10 +83,9 @@ export default function Partners() {
       return;
     }
 
-    const payload = {
+    const payload: any = {
       name: formName.trim(),
       name_ar: formNameAr.trim(),
-      contact_person: formContactPerson.trim(), // API ignores if customer
       phone: formPhone.trim(),
       email: formEmail.trim(),
       trn: formTrn.trim(),
@@ -92,28 +93,26 @@ export default function Partners() {
       balance: parseFloat(formBalance) || 0
     };
 
-    const endpoint = activeTab === 'customers' ? '/api/customers' : '/api/suppliers';
-    const method = editingId ? 'PUT' : 'POST';
-    const url = editingId ? `${endpoint}/${editingId}` : endpoint;
+    if (editingId) {
+      payload.id = editingId;
+    }
+
+    if (activeTab === 'suppliers') {
+      payload.contact_person = formContactPerson.trim();
+    }
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Operation failed. Check name uniqueness.');
-        return;
+      if (activeTab === 'customers') {
+        await CustomerService.save(payload);
+      } else {
+        await SupplierService.save(payload);
       }
 
       // Success
       setShowFormModal(false);
       fetchPartners();
     } catch (err: any) {
-      setErrorMsg('Server connection error: ' + err.message);
+      setErrorMsg('Error saving record: ' + err.message);
     }
   };
 
@@ -121,19 +120,19 @@ export default function Partners() {
     const label = activeTab === 'customers' ? 'Customer' : 'Supplier';
     if (!confirm(`Are you sure you want to delete this ${label}?`)) return;
 
-    const endpoint = activeTab === 'customers' ? `/api/customers/${id}` : `/api/suppliers/${id}`;
     try {
-      const res = await fetch(endpoint, { method: 'DELETE' });
-      const data = await res.json();
-      if (res.ok) {
-        fetchPartners();
+      if (activeTab === 'customers') {
+        await CustomerService.delete(id);
       } else {
-        alert(data.error || 'Failed to delete record');
+        await SupplierService.delete(id);
       }
-    } catch (err) {
+      fetchPartners();
+    } catch (err: any) {
       console.error('Delete error:', err);
+      alert(err.message || 'Failed to delete record');
     }
   };
+
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

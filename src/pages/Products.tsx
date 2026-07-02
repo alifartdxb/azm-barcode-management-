@@ -8,7 +8,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { Product } from '../types';
 import { validateBarcode, generateLocalEan13 } from '../utils/barcode';
-import { localBulkImportProducts } from '../utils/localDb';
+import { ProductService } from '../services/ProductService';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,26 +55,17 @@ export default function Products() {
   const [validationErrors, setValidationErrors] = useState<{row: number, sku: string, name: string, message: string, severity: 'error' | 'warning'}[]>([]);
   const [columnMapping, setColumnMapping] = useState<{ [key: string]: string }>({});
 
-  const fetchProducts = () => {
+  const fetchProducts = async () => {
     setLoading(true);
-    fetch('/api/products')
-      .then(async res => {
-        const isJson = res.headers.get('content-type')?.includes('application/json');
-        const data = isJson ? await res.json() : null;
-        if (!res.ok) {
-          throw new Error(data?.error || `Server responded with status ${res.status}`);
-        }
-        return data;
-      })
-      .then(data => {
-        setProducts(data.products || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setMessage({ type: 'error', text: 'Failed to load products: ' + err.message });
-        setLoading(false);
-      });
+    try {
+      const data = await ProductService.getAll();
+      setProducts(data);
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: 'Failed to load products: ' + err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -95,7 +86,7 @@ export default function Products() {
   const barcodeValidation = newBarcode ? validateBarcode(newBarcode) : null;
 
   // Handle manual product submission
-  const handleManualAddSubmit = (e: React.FormEvent) => {
+  const handleManualAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -137,17 +128,8 @@ export default function Products() {
       status: 'Active'
     };
 
-    fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-    .then(async res => {
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create product');
-      return data;
-    })
-    .then((data) => {
+    try {
+      const data = await ProductService.save(payload);
       setMessage({ 
         type: 'success', 
         text: `Product '${newName}' created successfully! (Barcode: ${data.barcode})` 
@@ -168,11 +150,11 @@ export default function Products() {
       setNewDesc('');
       setNewBarcode('');
       fetchProducts();
-    })
-    .catch(err => {
+    } catch (err: any) {
       setFormError(err.message);
-    });
+    }
   };
+
 
   // Generate local barcode for manual entry form
   const triggerFormBarcodeGen = () => {
@@ -591,7 +573,7 @@ export default function Products() {
     try {
       for (let i = 0; i < totalItems; i += batchSize) {
         const batch = parsedProducts.slice(i, i + batchSize);
-        const result = await localBulkImportProducts(batch, overwriteOnImport, generateMissingOnImport);
+        const result = await ProductService.bulkImport(batch, overwriteOnImport, generateMissingOnImport);
         
         processedCount += result.count;
         inserted += result.inserted;
@@ -631,7 +613,7 @@ export default function Products() {
   };
 
   // Quick Action: Fix all blank barcodes for existing records
-  const handleBulkGenerateBarcodes = () => {
+  const handleBulkGenerateBarcodes = async () => {
     const missingCount = products.filter(p => !p.barcode || p.barcode.trim() === '').length;
     if (missingCount === 0) {
       setMessage({ type: 'info', text: 'All products currently have a barcode associated. No action needed.' });
@@ -640,46 +622,30 @@ export default function Products() {
 
     if (confirm(`Do you want to automatically generate EAN-13 barcodes for the ${missingCount} products with missing barcodes?`)) {
       setLoading(true);
-      fetch('/api/products/generate-missing', { method: 'POST' })
-        .then(async res => {
-          const isJson = res.headers.get('content-type')?.includes('application/json');
-          const data = isJson ? await res.json() : null;
-          if (!res.ok) {
-            throw new Error(data?.error || `Server responded with status ${res.status}`);
-          }
-          return data;
-        })
-        .then(data => {
-          setMessage({ type: 'success', text: data.message });
-          fetchProducts();
-        })
-        .catch(err => {
-          setMessage({ type: 'error', text: 'Generation failed: ' + err.message });
-          setLoading(false);
-        });
+      try {
+        const generated = await ProductService.generateMissingBarcodes();
+        setMessage({ type: 'success', text: `Successfully generated ${generated} barcodes.` });
+        fetchProducts();
+      } catch (err: any) {
+        setMessage({ type: 'error', text: 'Generation failed: ' + err.message });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm('Are you sure you want to delete all products? This action cannot be undone.')) {
-      fetch('/api/products', { method: 'DELETE' })
-        .then(async res => {
-          const isJson = res.headers.get('content-type')?.includes('application/json');
-          const data = isJson ? await res.json() : null;
-          if (!res.ok) {
-            throw new Error(data?.error || `Server responded with status ${res.status}`);
-          }
-          return data;
-        })
-        .then(() => {
-          setMessage({ type: 'success', text: 'Product inventory cleared completely.' });
-          fetchProducts();
-        })
-        .catch(err => {
-          setMessage({ type: 'error', text: 'Failed to clear data: ' + err.message });
-        });
+      try {
+        await ProductService.clearAll();
+        setMessage({ type: 'success', text: 'Product inventory cleared completely.' });
+        fetchProducts();
+      } catch (err: any) {
+        setMessage({ type: 'error', text: 'Failed to clear data: ' + err.message });
+      }
     }
   };
+
 
   const filteredProducts = products.filter(p => 
     p.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 

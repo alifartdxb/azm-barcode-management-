@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 import { validateBarcode } from '../utils/barcode';
+import { ProductService } from '../services/ProductService';
 
 interface LabelTemplate {
   id: string;
@@ -22,6 +23,7 @@ interface LabelTemplate {
   topMargin: number;    // mm
   leftMargin: number;   // mm
 }
+
 
 const TEMPLATES: LabelTemplate[] = [
   // A4 Layouts
@@ -95,19 +97,17 @@ export default function PrintLabels() {
   const [activeTab, setActiveTab] = useState<'template' | 'style' | 'items'>('template');
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => {
-        const prods = data.products || [];
+    ProductService.getAll()
+      .then(prods => {
         setProducts(prods);
         
         // Pre-select first 3 products to show quick previews, and initialize quantities to 5
         const initialSelected = new Set<number>();
         const initialQtys: Record<number, number> = {};
         prods.forEach((p: Product, i: number) => {
-          initialQtys[p.id] = 5;
+          initialQtys[p.id!] = 5;
           if (i < 3) {
-            initialSelected.add(p.id);
+            initialSelected.add(p.id!);
           }
         });
         setSelectedIds(initialSelected);
@@ -119,6 +119,7 @@ export default function PrintLabels() {
         setLoading(false);
       });
   }, []);
+
 
   // Update specific values in custom template
   const handleCustomChange = (key: keyof LabelTemplate, val: any) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PackageSearch, AlertTriangle, Hash, TrendingUp } from 'lucide-react';
 import { DashboardStats } from '../types';
+import { DashboardService } from '../services/DashboardService';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -10,8 +11,7 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(res => res.json())
+    DashboardService.getStats()
       .then(data => setStats(data))
       .catch(console.error);
   }, []);

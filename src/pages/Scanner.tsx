@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScanBarcode, Search, Package, AlertCircle, Plus, ShoppingCart } from 'lucide-react';
 import { Product } from '../types';
+import { ProductService } from '../services/ProductService';
 
 export default function Scanner() {
   const [scannedBarcode, setScannedBarcode] = useState('');
@@ -28,23 +29,21 @@ export default function Scanner() {
     }
   };
 
-  const fetchProductByBarcode = (barcode: string) => {
+  const fetchProductByBarcode = async (barcode: string) => {
     setError(null);
     setProduct(null);
     
-    fetch(`/api/products/scan/${encodeURIComponent(barcode)}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Product not found');
-        return res.json();
-      })
-      .then(data => {
-        setProduct(data);
-        addToInvoice(data);
-      })
-      .catch(err => {
-        setError(err.message);
-      });
+    try {
+      const data = await ProductService.getByBarcodeOrSku(barcode);
+      if (!data) throw new Error('Product not found');
+      
+      setProduct(data);
+      addToInvoice(data);
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
+
 
   const addToInvoice = (prod: Product) => {
     setInvoiceItems(prev => {

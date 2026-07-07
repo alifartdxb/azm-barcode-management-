@@ -141,6 +141,9 @@ export interface DashboardStats {
   totalProducts: number;
   noBarcode: number;
   lowStock: number;
-  totalSales?: number;
-  totalInvoices?: number;
+  totalSales: number;
+  totalInvoices: number;
+  activeCustomers: number;
+  recentTransactions: Array<{ name: string; email: string; amount: string; status: string }>;
+  salesChartData: Array<{ name: string; total: number }>;
 }

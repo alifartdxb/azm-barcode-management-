@@ -36,6 +36,7 @@ const TEMPLATES: LabelTemplate[] = [
   { id: 'thermal-40-25', name: 'Thermal - 40 × 25 mm (Continuous)', mode: 'thermal', columns: 1, rows: 1, labelWidth: 40, labelHeight: 25, columnGap: 0, rowGap: 0, topMargin: 0, leftMargin: 0 },
   { id: 'thermal-50-25', name: 'Thermal - 50 × 25 mm (Continuous)', mode: 'thermal', columns: 1, rows: 1, labelWidth: 50, labelHeight: 25, columnGap: 0, rowGap: 0, topMargin: 0, leftMargin: 0 },
   { id: 'thermal-60-40', name: 'Thermal - 60 × 40 mm (Continuous)', mode: 'thermal', columns: 1, rows: 1, labelWidth: 60, labelHeight: 40, columnGap: 0, rowGap: 0, topMargin: 0, leftMargin: 0 },
+  { id: 'thermal-75-35', name: 'Thermal - 75 × 35 mm (Continuous)', mode: 'thermal', columns: 1, rows: 1, labelWidth: 75, labelHeight: 35, columnGap: 0, rowGap: 0, topMargin: 0, leftMargin: 0 },
   { id: 'thermal-80-50', name: 'Thermal - 80 × 50 mm (Continuous)', mode: 'thermal', columns: 1, rows: 1, labelWidth: 80, labelHeight: 50, columnGap: 0, rowGap: 0, topMargin: 0, leftMargin: 0 },
   
   // Custom

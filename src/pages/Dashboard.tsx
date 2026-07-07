@@ -15,28 +15,16 @@ import {
   BarChart, Bar, Legend
 } from 'recharts';
 
-const salesData = [
-  { name: 'Jan', total: 1200 },
-  { name: 'Feb', total: 2100 },
-  { name: 'Mar', total: 800 },
-  { name: 'Apr', total: 1600 },
-  { name: 'May', total: 2400 },
-  { name: 'Jun', total: 1400 },
-  { name: 'Jul', total: 3200 },
-];
-
-const categoryData = [
-  { name: 'Electronics', value: 400 },
-  { name: 'Hardware', value: 300 },
-  { name: 'Plumbing', value: 300 },
-  { name: 'Paint', value: 200 },
-];
-
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     noBarcode: 0,
-    lowStock: 0
+    lowStock: 0,
+    totalSales: 0,
+    totalInvoices: 0,
+    activeCustomers: 0,
+    recentTransactions: [],
+    salesChartData: []
   });
 
   useEffect(() => {
@@ -62,12 +50,11 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
+            <div className="text-2xl font-bold">${stats.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-green-500 flex items-center mr-1">
-                <ArrowUpRight className="h-3 w-3" /> +20.1%
+                <ArrowUpRight className="h-3 w-3" /> All Time
               </span>
-              from last month
             </p>
           </CardContent>
         </Card>
@@ -77,12 +64,11 @@ export default function Dashboard() {
             <Receipt className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+2350</div>
+            <div className="text-2xl font-bold">{stats.totalInvoices.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-green-500 flex items-center mr-1">
-                <ArrowUpRight className="h-3 w-3" /> +180.1%
+                Total recorded
               </span>
-              from last month
             </p>
           </CardContent>
         </Card>
@@ -107,12 +93,11 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+573</div>
+            <div className="text-2xl font-bold">{stats.activeCustomers.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-green-500 flex items-center mr-1">
-                <ArrowUpRight className="h-3 w-3" /> +201
+                <ArrowUpRight className="h-3 w-3" /> Total clients
               </span>
-              since last week
             </p>
           </CardContent>
         </Card>
@@ -126,7 +111,7 @@ export default function Dashboard() {
           <CardContent className="pl-2">
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <AreaChart data={stats.salesChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
@@ -154,13 +139,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-8">
-              {[
-                { name: 'Olivia Martin', email: 'olivia.martin@email.com', amount: '+$1,999.00', status: 'Success' },
-                { name: 'Jackson Lee', email: 'jackson.lee@email.com', amount: '+$39.00', status: 'Pending' },
-                { name: 'Isabella Nguyen', email: 'isabella.nguyen@email.com', amount: '+$299.00', status: 'Success' },
-                { name: 'William Kim', email: 'will@email.com', amount: '+$99.00', status: 'Success' },
-                { name: 'Sofia Davis', email: 'sofia.davis@email.com', amount: '+$39.00', status: 'Failed' },
-              ].map((tx, i) => (
+              {stats.recentTransactions.length > 0 ? stats.recentTransactions.map((tx, i) => (
                 <div key={i} className="flex items-center">
                   <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs uppercase">
                     {tx.name.substring(0, 2)}
@@ -171,7 +150,11 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-auto font-medium">{tx.amount}</div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center text-muted-foreground text-sm py-12">
+                  No recent transactions
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -179,10 +162,10 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { title: "Purchase Orders", value: "14", desc: "Awaiting delivery", icon: ShoppingCart },
+          { title: "Purchase Orders", value: "0", desc: "Awaiting delivery", icon: ShoppingCart },
           { title: "Missing Barcodes", value: stats.noBarcode.toString(), desc: "Needs updating", icon: Hash, alert: true },
-          { title: "Labels Printed", value: "1,204", desc: "Past 30 days", icon: Activity },
-          { title: "Quotations", value: "32", desc: "Pending approval", icon: Receipt },
+          { title: "Labels Printed", value: "0", desc: "Past 30 days", icon: Activity },
+          { title: "Quotations", value: "0", desc: "Pending approval", icon: Receipt },
         ].map((item, i) => (
           <Card key={i}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

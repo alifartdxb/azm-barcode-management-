@@ -392,20 +392,54 @@ export async function localDeleteInvoice(id: number): Promise<void> {
 }
 
 export async function localGetDashboardStats(): Promise<DashboardStats> {
-  const [totalProducts, noBarcode, lowStock, allInvoices] = await Promise.all([
+  const [totalProducts, noBarcode, lowStock, allInvoices, allCustomers] = await Promise.all([
     db.products.count(),
     db.products.filter(p => !p.barcode || p.barcode.trim() === '').count(),
     db.products.filter(p => p.stock_quantity < 10).count(),
-    db.invoices.toArray()
+    db.invoices.toArray(),
+    db.customers.toArray()
   ]);
 
   const totalSales = parseFloat(allInvoices.reduce((sum, inv) => sum + (inv.grand_total || 0), 0).toFixed(2));
   
+  // Sort invoices by date desc
+  const sortedInvoices = [...allInvoices].sort((a, b) => {
+    return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+  });
+  
+  const recentTransactions = sortedInvoices.slice(0, 5).map(inv => ({
+    name: inv.customer_name || 'Walk-in Customer',
+    email: inv.customer_name ? 'Registered Customer' : 'No Email',
+    amount: `+$${(inv.grand_total || 0).toFixed(2)}`,
+    status: inv.payment_status || 'Paid'
+  }));
+
+  // Chart data (last 7 days)
+  const salesChartData = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateString = d.toISOString().split('T')[0];
+    const shortName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    
+    const dayTotal = allInvoices
+      .filter(inv => inv.date && inv.date.startsWith(dateString))
+      .reduce((sum, inv) => sum + (inv.grand_total || 0), 0);
+      
+    salesChartData.push({
+      name: shortName,
+      total: dayTotal
+    });
+  }
+
   return {
     totalProducts,
     noBarcode,
     lowStock,
     totalSales,
     totalInvoices: allInvoices.length,
+    activeCustomers: allCustomers.length,
+    recentTransactions,
+    salesChartData
   };
 }

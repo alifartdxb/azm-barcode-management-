@@ -37,7 +37,12 @@ export default function Dashboard() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Executive Dashboard</h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Executive Dashboard</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Welcome back, <strong>Admin</strong>. Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+          </p>
+        </div>
         <div className="flex items-center space-x-2">
           <Button variant="outline" className="hidden md:flex">Download Report</Button>
           <Button>Create Invoice</Button>
@@ -190,10 +195,10 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { title: "Purchase Orders", value: "0", desc: "Awaiting delivery", icon: ShoppingCart },
+          { title: "Purchase Orders", value: (stats.totalPurchases || 0).toString(), desc: "Awaiting delivery", icon: ShoppingCart },
           { title: "Missing Barcodes", value: stats.noBarcode.toString(), desc: "Needs updating", icon: Hash, alert: true },
           { title: "Labels Printed", value: "0", desc: "Past 30 days", icon: Activity },
-          { title: "Quotations", value: "0", desc: "Pending approval", icon: Receipt },
+          { title: "Quotations", value: (stats.totalQuotations || 0).toString(), desc: "Pending approval", icon: Receipt },
         ].map((item, i) => (
           <Card key={i}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

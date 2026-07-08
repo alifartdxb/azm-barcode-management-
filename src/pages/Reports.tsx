@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
 import { 
   BarChart4, Download, FileText, PieChart, TrendingUp, Calendar, AlertTriangle
 } from 'lucide-react';
@@ -6,6 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 
 export default function Reports() {
+  const invoices = useLiveQuery(() => db.invoices.toArray(), []) || [];
+  const products = useLiveQuery(() => db.products.toArray(), []) || [];
+
+  const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.grand_total || 0), 0);
+  const lowStockCount = products.filter(p => p.stock_quantity <= (p.minimum_stock || 10)).length;
+  const noBarcodeCount = products.filter(p => !p.barcode || p.barcode.trim() === '').length;
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-y-auto">
       <div className="flex flex-wrap gap-4 items-center justify-between shrink-0 p-6 border-b bg-card">
@@ -30,9 +39,8 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                <ReportItem title="Daily Sales Summary" desc="Revenue breakdown by day and payment method." />
+                <ReportItem title="Daily Sales Summary" desc={`Total Recorded Revenue: $${totalRevenue.toFixed(2)}`} />
                 <ReportItem title="Monthly Revenue Analysis" desc="Month-over-month growth and trend analysis." />
-                <ReportItem title="Top Selling Products" desc="Best performing items by volume and revenue." />
                 <ReportItem title="Customer Purchase History" desc="Sales grouped by customer account." />
               </div>
             </CardContent>
@@ -50,10 +58,9 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                <ReportItem title="Current Stock Valuation" desc="Total inventory value at cost and retail price." />
-                <ReportItem title="Low Stock Alerts" desc="Items below minimum threshold." icon={<AlertTriangle className="w-4 h-4 text-amber-500" />} />
-                <ReportItem title="Stock Movement" desc="In/out ledger for all inventory adjustments." />
-                <ReportItem title="Missing Barcodes" desc="List of products requiring barcode generation." />
+                <ReportItem title="Current Stock Valuation" desc={`Total Catalog Items: ${products.length}`} />
+                <ReportItem title="Low Stock Alerts" desc={`${lowStockCount} items below minimum threshold.`} icon={<AlertTriangle className="w-4 h-4 text-amber-500" />} />
+                <ReportItem title="Missing Barcodes" desc={`${noBarcodeCount} items require barcode generation.`} />
               </div>
             </CardContent>
           </Card>

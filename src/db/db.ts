@@ -2,6 +2,7 @@ import Dexie, { Table } from 'dexie';
 import { Product, Customer, Supplier, Invoice, Quotation, PurchaseOrder, InventoryHistory, AppSettings } from '../types';
 
 export class ERPDatabase extends Dexie {
+  users!: Table<any, number>;
   products!: Table<Product, number>;
   customers!: Table<Customer, number>;
   suppliers!: Table<Supplier, number>;
@@ -23,6 +24,10 @@ export class ERPDatabase extends Dexie {
       inventoryHistory: '++id, product_id, type, created_at',
       settings: 'id'
     });
+    this.version(2).stores({
+      users: '++id, name, email, role, status'
+    });
+  
   }
 }
 

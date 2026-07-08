@@ -1,13 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '../db/db';
 import { 
-  Settings as SettingsIcon, Building2, Receipt, Printer, Database,
-  Globe, Shield, Bell, Save
+  Building2, Receipt, Printer, Database,
+  Globe, Bell, Save
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 
 export default function Settings() {
+  const [settings, setSettings] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    db.settings.get(1).then(s => {
+      setSettings(s || {});
+      setLoading(false);
+    });
+  }, []);
+
+  const handleSave = async () => {
+    if (settings) {
+      settings.id = 1;
+      await db.settings.put(settings);
+      alert('Settings saved successfully!');
+    }
+  };
+
+  const updateField = (field: string, value: any) => {
+    setSettings((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  if (loading) return null;
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-y-auto">
       <div className="flex flex-wrap gap-4 items-center justify-between shrink-0 p-6 border-b bg-card sticky top-0 z-10">
@@ -17,7 +42,7 @@ export default function Settings() {
         </div>
         
         <div className="flex gap-3 items-center">
-          <Button className="flex items-center gap-2">
+          <Button className="flex items-center gap-2" onClick={handleSave}>
             <Save className="w-4 h-4" />
             Save Changes
           </Button>
@@ -46,25 +71,25 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Company Name</label>
-                <Input defaultValue="Al Zahra Al Malakia Building Materials Trading LLC" />
+                <Input value={settings?.company_name || ''} onChange={e => updateField('company_name', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Branch / Location</label>
-                <Input defaultValue="Sharjah Branch" />
+                <Input value={settings?.company_address || ''} onChange={e => updateField('company_address', e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Phone Number</label>
-                  <Input defaultValue="+971 6 123 4567" />
+                  <Input value={settings?.company_phone || ''} onChange={e => updateField('company_phone', e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Email Address</label>
-                  <Input defaultValue="info@alzahra.com" />
+                  <Input value={settings?.company_email || ''} onChange={e => updateField('company_email', e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">TRN / Tax Registration Number</label>
-                <Input defaultValue="100234567890003" />
+                <Input value={settings?.company_trn || ''} onChange={e => updateField('company_trn', e.target.value)} />
               </div>
             </CardContent>
           </Card>
@@ -78,14 +103,26 @@ export default function Settings() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Default Currency</label>
-                  <select className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                  <select 
+                    value={settings?.currency || 'AED'} 
+                    onChange={e => updateField('currency', e.target.value)}
+                    className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
                     <option value="AED">AED (UAE Dirham)</option>
                     <option value="USD">USD (US Dollar)</option>
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Default VAT (%)</label>
-                  <Input type="number" defaultValue="5.0" />
+                  <Input type="number" value={settings?.default_vat || 5} onChange={e => updateField('default_vat', parseFloat(e.target.value) || 0)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Invoice Prefix</label>
+                  <Input value={settings?.invoice_prefix || 'INV-'} onChange={e => updateField('invoice_prefix', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Quotation Prefix</label>
+                  <Input value={settings?.quotation_prefix || 'QT-'} onChange={e => updateField('quotation_prefix', e.target.value)} />
                 </div>
               </div>
             </CardContent>

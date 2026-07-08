@@ -18,6 +18,8 @@ import Suppliers from './pages/Suppliers';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Backup from './pages/Backup';
+import Logs from './pages/Logs';
 import { Layout } from './components/Layout';
 import { Footer } from './components/Footer';
 
@@ -38,6 +40,8 @@ function AppContent() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<Users />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/backup" element={<Backup />} />
+        <Route path="/logs" element={<Logs />} />
       </Route>
     </Routes>
   );

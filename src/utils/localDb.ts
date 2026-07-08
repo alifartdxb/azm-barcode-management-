@@ -1,5 +1,5 @@
 import { db } from '../db/db';
-import { Product, Customer, Supplier, Invoice, DashboardStats } from '../types';
+import { Product, Customer, Supplier, Invoice, DashboardStats, Quotation, PurchaseOrder } from '../types';
 
 export async function localGetProducts(): Promise<Product[]> {
   return db.products.toArray();
@@ -392,12 +392,14 @@ export async function localDeleteInvoice(id: number): Promise<void> {
 }
 
 export async function localGetDashboardStats(): Promise<DashboardStats> {
-  const [totalProducts, noBarcode, lowStock, allInvoices, allCustomers] = await Promise.all([
+  const [totalProducts, noBarcode, lowStock, allInvoices, allCustomers, totalQuotations, totalPurchases] = await Promise.all([
     db.products.count(),
     db.products.filter(p => !p.barcode || p.barcode.trim() === '').count(),
     db.products.filter(p => p.stock_quantity < 10).count(),
     db.invoices.toArray(),
-    db.customers.toArray()
+    db.customers.toArray(),
+    db.quotations.count(),
+    db.purchaseOrders.count()
   ]);
 
   const totalSales = parseFloat(allInvoices.reduce((sum, inv) => sum + (inv.grand_total || 0), 0).toFixed(2));
@@ -439,7 +441,47 @@ export async function localGetDashboardStats(): Promise<DashboardStats> {
     totalSales,
     totalInvoices: allInvoices.length,
     activeCustomers: allCustomers.length,
+    totalQuotations,
+    totalPurchases,
     recentTransactions,
     salesChartData
   };
+}
+
+export async function localGetQuotations(): Promise<Quotation[]> {
+  return db.quotations.toArray();
+}
+export async function localSaveQuotation(quotation: Quotation): Promise<Quotation> {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const pattern = `QT-${today}-`;
+  if (!quotation.quotation_number) {
+    const dailyCount = await db.quotations.filter(q => q.quotation_number.startsWith(pattern)).count();
+    const sequence = (dailyCount + 1).toString().padStart(4, '0');
+    quotation.quotation_number = `QT-${today}-${sequence}`;
+  }
+  const id = await db.quotations.put(quotation as any);
+  quotation.id = id as number;
+  return quotation;
+}
+export async function localDeleteQuotation(id: number): Promise<void> {
+  await db.quotations.delete(id);
+}
+
+export async function localGetPurchases(): Promise<PurchaseOrder[]> {
+  return db.purchaseOrders.toArray();
+}
+export async function localSavePurchase(purchase: PurchaseOrder): Promise<PurchaseOrder> {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const pattern = `PO-${today}-`;
+  if (!purchase.po_number) {
+    const dailyCount = await db.purchaseOrders.filter(p => p.po_number.startsWith(pattern)).count();
+    const sequence = (dailyCount + 1).toString().padStart(4, '0');
+    purchase.po_number = `PO-${today}-${sequence}`;
+  }
+  const id = await db.purchaseOrders.put(purchase as any);
+  purchase.id = id as number;
+  return purchase;
+}
+export async function localDeletePurchase(id: number): Promise<void> {
+  await db.purchaseOrders.delete(id);
 }

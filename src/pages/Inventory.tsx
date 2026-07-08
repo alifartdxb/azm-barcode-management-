@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
 import { 
   Search, Plus, Filter, Download, ArrowUpDown, MoreHorizontal,
-  PackageCheck, AlertTriangle, ArrowRightLeft
+  PackageCheck, AlertTriangle, ArrowRightLeft, Edit2, X, CheckCircle2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -10,33 +12,31 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { ProductService } from '../services/ProductService';
 import { Product } from '../types';
 
 export default function Inventory() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingStock, setEditingStock] = useState<number | null>(null);
+  const [newStockVal, setNewStockVal] = useState<number>(0);
 
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const data = await ProductService.getAll();
-        setProducts(data);
-      } catch (error) {
-        console.error("Failed to load inventory", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchInventory();
-  }, []);
+  const products = useLiveQuery(() => db.products.toArray(), []) || [];
+  const loading = products === undefined;
 
   const filteredProducts = products.filter(p => 
     p.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const startEdit = (p: Product) => {
+    setEditingStock(p.id!);
+    setNewStockVal(p.stock_quantity);
+  };
+
+  const saveStock = async (p: Product) => {
+    await db.products.update(p.id!, { stock_quantity: newStockVal });
+    setEditingStock(null);
+  };
 
   return (
     <div className="flex flex-col h-full bg-background relative">
@@ -124,17 +124,11 @@ export default function Inventory() {
                   <TableHead className="text-right">Stock Value</TableHead>
                   <TableHead className="text-right">In Stock</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[100px]">Adjust</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
-                      Loading inventory...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredProducts.length === 0 ? (
+                {filteredProducts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                       No inventory records found.
@@ -151,7 +145,13 @@ export default function Inventory() {
                         <TableCell className="text-right font-mono text-xs">${(product.cost_price || 0).toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono text-xs">${value.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono text-sm font-semibold">
-                          {product.stock_quantity}
+                          {editingStock === product.id ? (
+                            <div className="flex items-center justify-end gap-1">
+                               <Input type="number" className="w-16 h-7 text-xs px-1 text-right" value={newStockVal} onChange={e => setNewStockVal(parseInt(e.target.value)||0)} />
+                               <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={() => saveStock(product)}><CheckCircle2 className="h-4 w-4"/></Button>
+                               <Button size="icon" variant="ghost" className="h-6 w-6 text-red-600" onClick={() => setEditingStock(null)}><X className="h-4 w-4"/></Button>
+                            </div>
+                          ) : product.stock_quantity}
                         </TableCell>
                         <TableCell>
                           {product.stock_quantity <= 0 ? (
@@ -163,9 +163,11 @@ export default function Inventory() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                          {editingStock !== product.id && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(product)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

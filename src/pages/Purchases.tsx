@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { localSavePurchase, localDeletePurchase } from '../utils/localDb';
 import { 
   ShoppingCart, Plus, Search, Filter, Download, MoreHorizontal,
-  Truck, CheckCircle2, Clock
+  Truck, CheckCircle2, Clock, X
 } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -10,16 +13,55 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-
-const MOCK_POS = [
-  { id: 'PO-2024-089', date: '2024-02-18', supplier: 'Global Hardware Co.', amount: 12450.00, expected: '2024-02-25', status: 'ordered' },
-  { id: 'PO-2024-088', date: '2024-02-16', supplier: 'Emirates Steel', amount: 89000.00, expected: '2024-02-20', status: 'shipped' },
-  { id: 'PO-2024-087', date: '2024-02-10', supplier: 'RAK Ceramics', amount: 34200.50, expected: '2024-02-15', status: 'received' },
-  { id: 'PO-2024-086', date: '2024-02-05', supplier: 'Makita Tools Middle East', amount: 5600.00, expected: '2024-02-12', status: 'received' },
-];
+import { PurchaseOrder } from '../types';
 
 export default function Purchases() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [supplierName, setSupplierName] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const purchases = useLiveQuery(() => db.purchaseOrders.toArray(), []) || [];
+
+  const filtered = purchases.filter(po => 
+    po.po_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (po.supplier_name && po.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const activeOrders = purchases.filter(po => po.status !== 'received' && po.status !== 'cancelled').length;
+  const pendingValue = purchases.filter(po => po.status !== 'received').reduce((sum, po) => sum + (po.total_amount || 0), 0);
+  const pendingDelivery = purchases.filter(po => po.status === 'shipped').length;
+  const received = purchases.filter(po => po.status === 'received').length;
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(amount) || 0;
+    await localSavePurchase({
+      po_number: '',
+      supplier_id: Date.now(),
+      supplier_name: supplierName,
+      total_amount: val,
+      status: 'ordered',
+      created_at: new Date().toISOString(),
+      expected_date: new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10),
+      items: []
+    } as PurchaseOrder);
+    setIsModalOpen(false);
+    setSupplierName('');
+    setAmount('');
+  };
+
+  const handleDelete = async (id?: number) => {
+    if (id && confirm('Delete this Purchase Order?')) {
+      await localDeletePurchase(id);
+    }
+  };
+
+  const markStatus = async (po: PurchaseOrder, status: string) => {
+    po.status = status;
+    await db.purchaseOrders.put(po);
+  };
 
   return (
     <div className="flex flex-col h-full bg-background relative">
@@ -34,7 +76,7 @@ export default function Purchases() {
             <Download className="w-4 h-4" />
             Export
           </Button>
-          <Button className="flex items-center gap-2">
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
             New Purchase Order
           </Button>
@@ -45,25 +87,25 @@ export default function Purchases() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground font-medium mb-2">Active Orders</p>
-            <p className="text-3xl font-bold text-primary">12</p>
+            <p className="text-3xl font-bold text-primary">{activeOrders}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground font-medium mb-2">Value (Incoming)</p>
-            <p className="text-3xl font-bold">$101,450</p>
+            <p className="text-3xl font-bold">${pendingValue.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground font-medium mb-2">Pending Delivery</p>
-            <p className="text-3xl font-bold text-amber-600">8</p>
+            <p className="text-3xl font-bold text-amber-600">{pendingDelivery}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground font-medium mb-2">Received (This Month)</p>
-            <p className="text-3xl font-bold text-green-600">34</p>
+            <p className="text-sm text-muted-foreground font-medium mb-2">Received</p>
+            <p className="text-3xl font-bold text-green-600">{received}</p>
           </CardContent>
         </Card>
       </div>
@@ -97,17 +139,17 @@ export default function Purchases() {
                   <TableHead>Expected</TableHead>
                   <TableHead className="text-right">Total Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_POS.map((po) => (
+                {filtered.map((po) => (
                   <TableRow key={po.id}>
-                    <TableCell className="font-mono text-sm font-medium text-primary">{po.id}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{po.date}</TableCell>
-                    <TableCell className="font-medium">{po.supplier}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{po.expected}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">${po.amount.toFixed(2)}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium text-primary">{po.po_number}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{new Date(po.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-medium">{po.supplier_name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{po.expected_date}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">${(po.total_amount || 0).toFixed(2)}</TableCell>
                     <TableCell>
                       {po.status === 'ordered' && (
                         <Badge variant="warning" className="gap-1.5"><Clock className="w-3 h-3" /> Ordered</Badge>
@@ -120,17 +162,59 @@ export default function Purchases() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {po.status === 'ordered' && (
+                           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => markStatus(po, 'shipped')}>Mark Shipped</Button>
+                        )}
+                        {po.status === 'shipped' && (
+                           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => markStatus(po, 'received')}>Receive</Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => handleDelete(po.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filtered.length === 0 && (
+                   <TableRow>
+                     <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No purchase orders found.</TableCell>
+                   </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
         </Card>
       </div>
+
+      {isModalOpen && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-2xl">
+             <div className="px-6 py-4 border-b flex justify-between items-center">
+               <h3 className="font-bold text-lg">New Purchase Order</h3>
+               <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="h-8 w-8">
+                 <X className="w-4 h-4" />
+               </Button>
+             </div>
+             <CardContent className="p-6">
+               <form onSubmit={handleSave} className="flex flex-col gap-4">
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium">Supplier Name</label>
+                   <Input required value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="e.g. Global Hardware" />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium">Order Amount (AED)</label>
+                   <Input required type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                 </div>
+                 <div className="flex gap-3 pt-4 border-t mt-2">
+                   <Button type="button" variant="outline" className="flex-1" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                   <Button type="submit" className="flex-1">Save Order</Button>
+                 </div>
+               </form>
+             </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

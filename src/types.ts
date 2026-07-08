@@ -29,6 +29,22 @@ export interface Customer {
   credit_limit?: number;
   balance: number;
   created_at?: string;
+  
+  // CRM fields
+  customer_code?: string;
+  whatsapp_number?: string;
+  city?: string;
+  country?: string;
+  google_map?: string;
+  customer_type?: 'Contractor' | 'Builder' | 'Consultant' | 'Retail Customer' | 'Walk-in' | 'Architect' | 'Interior Designer' | 'Supplier';
+  opening_balance?: number;
+  payment_terms?: string;
+  sales_representative?: string;
+  source?: string;
+  status?: 'Active' | 'Inactive';
+  remarks?: string;
+  updated_at?: string;
+  image_url?: string;
 }
 
 export interface Supplier {

@@ -11,6 +11,10 @@ export class ERPDatabase extends Dexie {
   purchaseOrders!: Table<PurchaseOrder, number>;
   inventoryHistory!: Table<InventoryHistory, number>;
   settings!: Table<AppSettings, number>;
+  customerNotes!: Table<any, number>;
+  customerFollowups!: Table<any, number>;
+  whatsappTemplates!: Table<any, number>;
+  whatsappCampaigns!: Table<any, number>;
 
   constructor() {
     super('OfflineERPDB');
@@ -26,6 +30,12 @@ export class ERPDatabase extends Dexie {
     });
     this.version(2).stores({
       users: '++id, name, email, role, status'
+    });
+    this.version(3).stores({
+      customerNotes: '++id, customer_id, created_at',
+      customerFollowups: '++id, customer_id, type, date, status',
+      whatsappTemplates: '++id, name, type',
+      whatsappCampaigns: '++id, name, status'
     });
   
   }

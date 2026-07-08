@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, Printer, ScanBarcode, Coins, Users,
   ChevronLeft, ChevronRight, Settings, HelpCircle, LogOut, Heart, Clock,
-  FileText, ShoppingCart, Truck, Activity, Database, Shield, BarChart4
+  FileText, ShoppingCart, Truck, Activity, Database, Shield, BarChart4, MessageSquare
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -24,6 +24,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     { to: '/billing', label: 'Sales & POS', icon: Coins },
     { to: '/quotations', label: 'Quotations', icon: FileText },
     { to: '/purchases', label: 'Purchase Orders', icon: ShoppingCart },
+    { to: '/crm', label: 'CRM & WhatsApp', icon: MessageSquare },
     { to: '/partners', label: 'Customers', icon: Users },
     { to: '/suppliers', label: 'Suppliers', icon: Truck },
     { to: '/reports', label: 'Reports', icon: BarChart4 },

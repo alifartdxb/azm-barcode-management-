@@ -11,6 +11,7 @@ import PrintLabels from './pages/PrintLabels';
 import Scanner from './pages/Scanner';
 import Billing from './pages/Billing';
 import Partners from './pages/Partners';
+import Crm from './pages/Crm';
 import Inventory from './pages/Inventory';
 import Quotations from './pages/Quotations';
 import Purchases from './pages/Purchases';
@@ -33,6 +34,7 @@ function AppContent() {
         <Route path="/print" element={<PrintLabels />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/partners" element={<Partners />} />
+        <Route path="/crm" element={<Crm />} />
         <Route path="/scanner" element={<Scanner />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/quotations" element={<Quotations />} />

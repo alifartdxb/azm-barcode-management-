@@ -67,11 +67,11 @@ export function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
         <div className="hidden lg:flex items-center gap-4 mr-4 text-xs font-medium text-muted-foreground">
           <div className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors">
             <Building2 className="h-3.5 w-3.5" />
-            <span>AZM Main Corp</span>
+            <span className="max-w-[200px] truncate" title="Al Zahra Al Malakia Building Materials Trading LLC">Al Zahra Al Malakia</span>
           </div>
           <div className="flex items-center gap-1.5 cursor-pointer hover:text-foreground transition-colors">
             <MapPin className="h-3.5 w-3.5" />
-            <span>Dubai Branch</span>
+            <span>Shj. Br.</span>
           </div>
           <div className="flex items-center gap-1.5">
             <CalendarIcon className="h-3.5 w-3.5" />

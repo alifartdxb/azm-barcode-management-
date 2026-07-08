@@ -662,33 +662,35 @@ export default function Products() {
 
   return (
     <div 
-      className="flex flex-col h-full bg-brand-bg relative"
+      className="flex flex-col h-full relative bg-background"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="absolute inset-0 bg-brand-ink/90 border-4 border-dashed border-brand-accent z-50 flex flex-col items-center justify-center p-6 text-white animate-in fade-in duration-100">
-          <Upload className="w-16 h-16 text-brand-accent animate-bounce mb-4" />
-          <span className="font-bold uppercase tracking-wider text-lg">Drop your CSV or Excel file here</span>
-          <p className="text-xs opacity-80 mt-1 font-mono">Process product lists completely in-browser with secure local indexing</p>
+        <div className="absolute inset-0 bg-primary/95 border-4 border-dashed border-primary z-50 flex flex-col items-center justify-center p-6 text-primary-foreground animate-in fade-in duration-200">
+          <Upload className="w-16 h-16 mb-4 animate-bounce" />
+          <span className="font-bold tracking-tight text-2xl">Drop your CSV or Excel file here</span>
+          <p className="text-sm opacity-80 mt-2">Process product lists completely in-browser with secure local indexing</p>
         </div>
       )}
 
       {importProgress !== null && (
-        <div className="absolute inset-0 bg-[#00000075] backdrop-blur-xs z-50 flex flex-col items-center justify-center p-6">
-          <div className="bg-white border-2 border-brand-line p-6 w-full max-w-md shadow-[10px_10px_0_rgba(0,0,0,0.15)] text-center flex flex-col gap-4">
-            <RefreshCw className="w-8 h-8 text-brand-accent animate-spin mx-auto" />
-            <span className="font-bold uppercase tracking-wider text-xs text-brand-ink">Client-Side High Performance Importing...</span>
-            <div className="w-full bg-gray-100 border border-brand-line h-4 overflow-hidden relative">
-              <div 
-                className="bg-brand-accent h-full transition-all duration-150 ease-out" 
-                style={{ width: `${importProgress}%` }}
-              />
-            </div>
-            <span className="font-mono font-bold text-sm text-brand-accent">{importProgress}% Completed</span>
-            <p className="text-[10px] text-gray-500">Writing items asynchronously to client IndexedDB relational engine...</p>
-          </div>
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-6">
+          <Card className="w-full max-w-md shadow-lg border">
+            <CardContent className="pt-6 pb-6 text-center flex flex-col gap-4">
+              <RefreshCw className="w-8 h-8 text-primary animate-spin mx-auto" />
+              <span className="font-semibold tracking-tight text-sm">Importing Data...</span>
+              <div className="w-full bg-muted rounded-full h-3 overflow-hidden relative">
+                <div 
+                  className="bg-primary h-full transition-all duration-150 ease-out" 
+                  style={{ width: `${importProgress}%` }}
+                />
+              </div>
+              <span className="font-medium text-sm text-primary">{importProgress}% Completed</span>
+              <p className="text-xs text-muted-foreground">Writing items asynchronously to client IndexedDB relational engine...</p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -775,17 +777,18 @@ export default function Products() {
       </div>
 
       {message && (
-        <div className={`mx-2 mb-2 p-3 border border-brand-line text-xs font-bold flex items-center justify-between gap-2 ${
-          message.type === 'success' ? 'bg-green-100 text-green-800 border-green-300' : 
-          message.type === 'info' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-red-100 text-red-800 border-red-300'
+        <div className={`mx-6 mt-6 p-4 rounded-md border text-sm flex items-center justify-between gap-3 ${
+          message.type === 'success' ? 'bg-green-50 text-green-900 border-green-200 dark:bg-green-900/30 dark:text-green-100 dark:border-green-900' : 
+          message.type === 'info' ? 'bg-blue-50 text-blue-900 border-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:border-blue-900' : 
+          'bg-red-50 text-red-900 border-red-200 dark:bg-red-900/30 dark:text-red-100 dark:border-red-900'
         }`}>
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            <span>{message.text}</span>
+          <div className="flex items-center gap-3">
+            {message.type === 'error' ? <AlertTriangle className="w-5 h-5 shrink-0" /> : <CheckCircle2 className="w-5 h-5 shrink-0" />}
+            <span className="font-medium">{message.text}</span>
           </div>
-          <button onClick={() => setMessage(null)} className="opacity-70 hover:opacity-100">
+          <Button variant="ghost" size="icon" onClick={() => setMessage(null)} className="h-8 w-8 hover:bg-black/5 dark:hover:bg-white/10">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -882,42 +885,42 @@ export default function Products() {
 
       {/* SIDE DRAWER: Manual Add Product Form */}
       {isAddOpen && (
-        <div className="absolute inset-y-0 right-0 w-[380px] bg-white border-l-2 border-brand-line shadow-[0_0_30px_rgba(0,0,0,0.15)] z-40 flex flex-col animate-in slide-in-from-right duration-200">
-          <div className="px-4 py-3 border-b-2 border-brand-line font-bold text-xs uppercase tracking-wider bg-brand-header text-brand-ink flex justify-between items-center">
-            <span>+ Add New Product Record</span>
-            <button onClick={() => setIsAddOpen(false)} className="hover:text-red-600 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+        <div className="absolute inset-y-0 right-0 w-[420px] bg-background border-l shadow-2xl z-40 flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="px-6 py-4 border-b flex justify-between items-center bg-card">
+            <h3 className="font-semibold text-lg">Add New Product</h3>
+            <Button variant="ghost" size="icon" onClick={() => setIsAddOpen(false)} className="h-8 w-8">
+              <X className="w-4 h-4" />
+            </Button>
           </div>
 
-          <form onSubmit={handleManualAddSubmit} className="flex-1 overflow-auto p-4 flex flex-col gap-3 text-xs">
+          <form onSubmit={handleManualAddSubmit} className="flex-1 overflow-auto p-6 flex flex-col gap-5">
             {formError && (
-              <div className="bg-red-50 text-red-700 border border-red-200 p-2.5 font-bold flex gap-1.5 items-start">
-                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="bg-red-50 text-red-900 border-red-200 border p-3 rounded-md text-sm font-medium flex gap-2 items-start dark:bg-red-900/30 dark:text-red-100 dark:border-red-900">
+                <ShieldAlert className="w-5 h-5 shrink-0" />
                 <span>{formError}</span>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">SKU Code *</label>
-                <input 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">SKU Code <span className="text-red-500">*</span></label>
+                <Input 
                   type="text" 
                   value={newSku}
                   onChange={(e) => setNewSku(e.target.value)}
                   placeholder="e.g. AZ-4022"
-                  className={`w-full border p-1.5 outline-none font-mono font-bold ${isSkuDuplicate ? 'border-red-500 bg-red-50' : 'border-brand-line'}`}
+                  className={`font-mono ${isSkuDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   required
                 />
-                {isSkuDuplicate && <p className="text-red-600 text-[9px] mt-0.5 font-bold">⚠️ SKU already registered</p>}
+                {isSkuDuplicate && <p className="text-red-500 text-xs mt-1">SKU already registered</p>}
               </div>
               
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Unit Type</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Unit Type</label>
                 <select 
                   value={newUnit}
                   onChange={(e) => setNewUnit(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 bg-brand-sidebar"
+                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="pcs">Pcs (Each)</option>
                   <option value="box">Box</option>
@@ -928,172 +931,174 @@ export default function Products() {
               </div>
             </div>
 
-            <div>
-              <label className="block font-bold uppercase mb-1 text-[10px]">Product Title Name *</label>
-              <input 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Product Name <span className="text-red-500">*</span></label>
+              <Input 
                 type="text" 
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="e.g. Stainless Steel Screws 4mm"
-                className="w-full border border-brand-line p-1.5 outline-none font-bold"
                 required
               />
             </div>
 
-            <div>
-              <label className="block font-bold uppercase mb-1 text-[10px]">Arabic Title Name (Arabic / name_ar)</label>
-              <input 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Arabic Name (Optional)</label>
+              <Input 
                 type="text" 
                 value={newNameAr}
                 onChange={(e) => setNewNameAr(e.target.value)}
                 placeholder="اسم المنتج باللغة العربية"
-                className="w-full border border-brand-line p-1.5 outline-none text-right font-medium"
+                dir="rtl"
+                className="font-medium"
               />
             </div>
 
-            <div className="border border-dashed border-[#ccc] p-2.5 bg-brand-bg relative">
-              <div className="flex justify-between items-center mb-1">
-                <label className="block font-bold uppercase text-[10px] text-brand-ink">Barcode (Custom / System)</label>
-                <button 
+            <div className="border rounded-md p-4 bg-muted/30 space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium">Barcode (System/Custom)</label>
+                <Button 
                   type="button" 
+                  variant="outline"
+                  size="sm"
                   onClick={triggerFormBarcodeGen}
-                  className="text-[9px] font-bold text-brand-accent hover:underline flex items-center gap-0.5 uppercase"
+                  className="h-7 text-xs flex items-center gap-1.5"
                 >
                   <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                  Generate Unique EAN-13
-                </button>
+                  Auto-Generate
+                </Button>
               </div>
               
-              <input 
+              <Input 
                 type="text" 
                 value={newBarcode}
                 onChange={(e) => setNewBarcode(e.target.value)}
-                placeholder="Blank to auto-generate on submit"
-                className={`w-full border p-1.5 outline-none font-mono ${
-                  isBarcodeDuplicate ? 'border-red-500 bg-red-50 text-red-800' : 'border-brand-line'
-                }`}
+                placeholder="Leave blank to auto-generate"
+                className={`font-mono ${isBarcodeDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
 
               {isBarcodeDuplicate && (
-                <p className="text-red-600 text-[9px] mt-1 font-bold">⚠️ Duplicate: Barcode already exists in DB!</p>
+                <p className="text-red-500 text-xs">Duplicate: Barcode already exists in DB!</p>
               )}
 
               {newBarcode && barcodeValidation && (
-                <div className="mt-1 flex items-center gap-1.5 text-[9px]">
+                <div className="flex items-center gap-1.5 text-xs">
                   {barcodeValidation.isValid ? (
-                    <span className="text-green-700 font-bold">✓ Valid {barcodeValidation.type} format</span>
+                    <span className="text-green-600 font-medium flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid {barcodeValidation.type}
+                    </span>
                   ) : (
-                    <span className="text-amber-700 font-bold">⚠️ Format Issue: {barcodeValidation.errorMessage}</span>
+                    <span className="text-amber-600 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Format Warning: {barcodeValidation.errorMessage}
+                    </span>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Retail Price ($)</label>
-                <input 
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Retail Price ($)</label>
+                <Input 
                   type="number" 
                   step="0.01"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 font-mono outline-none"
+                  className="font-mono"
                 />
               </div>
               
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Cost Price ($)</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Cost Price ($)</label>
+                <Input 
                   type="number" 
                   step="0.01"
                   value={newCost}
                   onChange={(e) => setNewCost(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 font-mono outline-none"
+                  className="font-mono"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">VAT (%)</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">VAT (%)</label>
+                <Input 
                   type="number" 
                   step="0.1"
                   value={newVat}
                   onChange={(e) => setNewVat(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 font-mono outline-none"
+                  className="font-mono"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Category</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Category</label>
+                <Input 
                   type="text" 
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="e.g. Fasteners"
-                  className="w-full border border-brand-line p-1.5 outline-none"
                 />
               </div>
               
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Stock Level</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Stock Level</label>
+                <Input 
                   type="number" 
                   value={newStock}
                   onChange={(e) => setNewStock(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 font-mono outline-none"
+                  className="font-mono"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Brand / Mfr</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Brand / Mfr</label>
+                <Input 
                   type="text" 
                   value={newBrand}
                   onChange={(e) => setNewBrand(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 outline-none"
                 />
               </div>
               
-              <div>
-                <label className="block font-bold uppercase mb-1 text-[10px]">Supplier Account</label>
-                <input 
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Supplier Account</label>
+                <Input 
                   type="text" 
                   value={newSupplier}
                   onChange={(e) => setNewSupplier(e.target.value)}
-                  className="w-full border border-brand-line p-1.5 outline-none"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block font-bold uppercase mb-1 text-[10px]">Item Description Notes</label>
+            <div className="space-y-1.5 pb-4">
+              <label className="text-sm font-medium">Item Description</label>
               <textarea 
                 rows={2}
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 placeholder="Hardware specifications, grade ratings, or placement coordinates..."
-                className="w-full border border-brand-line p-1.5 outline-none resize-none"
+                className="w-full flex min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
 
-            <div className="mt-auto pt-4 flex gap-2">
-              <button 
-                type="submit"
-                className="flex-1 bg-brand-ink text-white border border-brand-line py-2 text-xs uppercase font-bold cursor-pointer hover:bg-opacity-90"
-              >
-                Save Product
-              </button>
-              <button 
+            <div className="mt-auto pt-4 flex gap-3 border-t">
+              <Button 
                 type="button" 
+                variant="outline"
+                className="flex-1"
                 onClick={() => setIsAddOpen(false)}
-                className="border border-brand-line px-4 py-2 text-xs uppercase bg-white cursor-pointer hover:bg-gray-100"
               >
                 Cancel
-              </button>
+              </Button>
+              <Button 
+                type="submit" 
+                className="flex-1"
+              >
+                Save Product
+              </Button>
             </div>
           </form>
         </div>
@@ -1101,52 +1106,53 @@ export default function Products() {
 
       {/* CSV IMPORT WIZARD / AUDIT DIALOG */}
       {isImportWizardOpen && (
-        <div className="absolute inset-0 bg-[#00000050] backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-brand-line w-full max-w-2xl shadow-[10px_10px_0_rgba(0,0,0,0.15)] overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-150">
-            
-            <div className="px-3 py-2 border-b-2 border-brand-line font-bold text-xs uppercase tracking-wider bg-brand-header text-brand-ink flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-brand-accent" />
-                <span>CSV / Excel Pre-Import Advanced Audit & Validation</span>
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-3xl shadow-2xl flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-card rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold text-lg">CSV / Excel Import Audit & Validation</h3>
               </div>
-              <button onClick={() => setIsImportWizardOpen(false)} className="hover:text-red-600 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setIsImportWizardOpen(false)} className="h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
             </div>
 
-            <div className="p-4 overflow-y-auto flex flex-col gap-4 text-xs">
+            <CardContent className="p-6 overflow-y-auto flex flex-col gap-6">
               
               {/* Audit Stats Bento */}
-              <div className="grid grid-cols-5 gap-2 text-center shrink-0">
-                <div className="bg-brand-sidebar border border-brand-line p-1.5">
-                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold">Total Rows</div>
-                  <div className="font-mono text-base font-black text-brand-ink">{wizardStats.total}</div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="border rounded-md p-3 text-center bg-card">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">Total Rows</div>
+                  <div className="font-mono text-2xl font-bold">{wizardStats.total}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-1.5">
-                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-green-700">Ready</div>
-                  <div className="font-mono text-base font-black text-green-600">{parsedProducts.length}</div>
+                <div className="border rounded-md p-3 text-center bg-card border-green-200 dark:border-green-900">
+                  <div className="text-xs uppercase tracking-wider text-green-600 dark:text-green-400 font-medium mb-1">Ready</div>
+                  <div className="font-mono text-2xl font-bold text-green-600 dark:text-green-400">{parsedProducts.length}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-1.5">
-                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-red-700">Skipped (Err)</div>
-                  <div className="font-mono text-base font-black text-red-600">{wizardStats.skippedRows}</div>
+                <div className="border rounded-md p-3 text-center bg-card border-red-200 dark:border-red-900">
+                  <div className="text-xs uppercase tracking-wider text-red-600 dark:text-red-400 font-medium mb-1">Skipped (Err)</div>
+                  <div className="font-mono text-2xl font-bold text-red-600 dark:text-red-400">{wizardStats.skippedRows}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-1.5">
-                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold">Empty</div>
-                  <div className="font-mono text-base font-black text-gray-500">{wizardStats.emptyRows}</div>
+                <div className="border rounded-md p-3 text-center bg-card">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">Empty</div>
+                  <div className="font-mono text-2xl font-bold text-muted-foreground">{wizardStats.emptyRows}</div>
                 </div>
-                <div className="bg-brand-sidebar border border-brand-line p-1.5">
-                  <div className="text-[8px] uppercase tracking-wider opacity-65 font-bold text-amber-700">No Barcode</div>
-                  <div className="font-mono text-base font-black text-amber-600">{wizardStats.missingBarcodes}</div>
+                <div className="border rounded-md p-3 text-center bg-card border-amber-200 dark:border-amber-900">
+                  <div className="text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 font-medium mb-1">No Barcode</div>
+                  <div className="font-mono text-2xl font-bold text-amber-600 dark:text-amber-400">{wizardStats.missingBarcodes}</div>
                 </div>
               </div>
 
               {/* Column Mapping Details */}
-              <div className="border border-brand-line p-2.5 bg-brand-bg shrink-0">
-                <span className="block font-bold uppercase text-[9px] mb-1 opacity-75">Mapped Fields / Headers:</span>
-                <div className="flex flex-wrap gap-1.5 text-[9px]">
-                  {Object.entries(columnMapping).map(([field, fileHeader]) => (
-                    <span key={field} className="bg-white border border-brand-line px-1.5 py-0.5 rounded font-mono">
-                      <strong className="text-brand-accent">{field}</strong> → <span className="opacity-70">{fileHeader}</span>
+              <div className="border rounded-md p-4 bg-muted/30">
+                <span className="block text-sm font-medium mb-2">Mapped Fields / Headers:</span>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {Object.entries(columnMapping).map(([field, fileHeader], i) => (
+                    <span key={i}>
+                      <Badge variant="outline" className="font-mono bg-background">
+                        <span className="text-primary font-semibold mr-1">{field}</span> → <span className="text-muted-foreground ml-1">{fileHeader}</span>
+                      </Badge>
                     </span>
                   ))}
                   {Object.keys(columnMapping).length === 0 && (
@@ -1156,33 +1162,33 @@ export default function Products() {
               </div>
 
               {/* Duplicate/Generation Settings Panel */}
-              <div className="border border-brand-line p-3 bg-brand-sidebar flex flex-col gap-2 shrink-0">
-                <span className="font-bold uppercase text-[10px] text-brand-ink">Conflict & Auto-Generation Options:</span>
+              <div className="border rounded-md p-5 bg-card flex flex-col gap-4">
+                <span className="text-sm font-medium">Conflict & Auto-Generation Options:</span>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="flex items-start gap-3 cursor-pointer p-2 rounded-md hover:bg-muted transition-colors">
                     <input 
                       type="checkbox"
                       checked={overwriteOnImport}
                       onChange={(e) => setOverwriteOnImport(e.target.checked)}
-                      className="mt-0.5 accent-brand-ink"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div>
-                      <span className="font-bold">Overwrite matching SKU</span>
-                      <p className="text-[9px] opacity-70">If checked, records with existing SKUs in the DB will be updated.</p>
+                      <span className="font-medium text-sm block">Overwrite matching SKU</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">If checked, records with existing SKUs in the DB will be updated.</p>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-2.5 cursor-pointer hover:bg-white p-1 rounded">
+                  <label className="flex items-start gap-3 cursor-pointer p-2 rounded-md hover:bg-muted transition-colors">
                     <input 
                       type="checkbox"
                       checked={generateMissingOnImport}
                       onChange={(e) => setGenerateMissingOnImport(e.target.checked)}
-                      className="mt-0.5 accent-brand-ink"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div>
-                      <span className="font-bold">Auto-generate Barcodes</span>
-                      <p className="text-[9px] opacity-70">Generates unique EAN-13 barcodes for blank or duplicate barcode values.</p>
+                      <span className="font-medium text-sm block">Auto-generate Barcodes</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Generates unique EAN-13 barcodes for blank or duplicate barcode values.</p>
                     </div>
                   </label>
                 </div>
@@ -1190,101 +1196,104 @@ export default function Products() {
 
               {/* Validation Results Table */}
               {validationErrors.length > 0 && (
-                <div className="flex flex-col gap-1.5 shrink-0">
+                <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold uppercase text-[10px] opacity-70 flex items-center gap-1 text-brand-ink">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="font-semibold text-sm flex items-center gap-2 text-amber-600 dark:text-amber-500">
+                      <AlertTriangle className="w-4 h-4" />
                       Validation Warnings & Errors ({validationErrors.length})
                     </span>
                   </div>
-                  <div className="border border-brand-line bg-white max-h-[140px] overflow-y-auto font-mono text-[9px]">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-brand-sidebar border-b border-brand-line text-[8px] font-bold uppercase sticky top-0 z-10">
-                          <th className="p-1 border-r border-brand-line w-[45px]">Row</th>
-                          <th className="p-1 border-r border-brand-line w-[80px]">SKU</th>
-                          <th className="p-1 border-r border-brand-line w-[100px] truncate">Product Name</th>
-                          <th className="p-1">Validation Audit Message</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="border rounded-md bg-background max-h-[160px] overflow-y-auto text-sm">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[60px]">Row</TableHead>
+                          <TableHead className="w-[120px]">SKU</TableHead>
+                          <TableHead className="w-[180px]">Product Name</TableHead>
+                          <TableHead>Validation Message</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {validationErrors.map((err, i) => (
-                          <tr key={i} className={`border-b border-gray-100 last:border-0 ${err.severity === 'error' ? 'bg-red-50/75 text-red-900' : 'bg-amber-50/75 text-amber-900'}`}>
-                            <td className="p-1 border-r border-brand-line text-center font-bold">#{err.row}</td>
-                            <td className="p-1 border-r border-brand-line font-bold truncate">{err.sku}</td>
-                            <td className="p-1 border-r border-brand-line truncate font-sans font-medium">{err.name}</td>
-                            <td className="p-1 font-sans font-medium flex items-center gap-1 flex-wrap">
-                              <span className={`px-1 rounded-[2px] font-bold text-[8px] uppercase text-white ${err.severity === 'error' ? 'bg-red-600' : 'bg-amber-600'}`}>
-                                {err.severity}
-                              </span>
-                              <span>{err.message}</span>
-                            </td>
-                          </tr>
+                          <TableRow key={i} className={err.severity === 'error' ? 'bg-red-50/50 dark:bg-red-900/10' : 'bg-amber-50/50 dark:bg-amber-900/10'}>
+                            <TableCell className="font-mono text-xs">#{err.row}</TableCell>
+                            <TableCell className="font-mono text-xs">{err.sku}</TableCell>
+                            <TableCell className="truncate max-w-[180px]">{err.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={err.severity === 'error' ? 'destructive' : 'warning'} className="text-[10px] px-1.5 py-0 uppercase">
+                                  {err.severity}
+                                </Badge>
+                                <span>{err.message}</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               )}
 
               {/* Data Preview Table (First 50 Rows) */}
-              <div className="flex flex-col gap-1.5 shrink-0">
-                <span className="block font-bold uppercase text-[10px] opacity-70">
+              <div className="flex flex-col gap-2">
+                <span className="font-semibold text-sm">
                   Data Audit Preview ({Math.min(50, parsedProducts.length)} of {parsedProducts.length} processable rows):
                 </span>
-                <div className="border border-brand-line bg-white max-h-[160px] overflow-y-auto font-mono text-[9px]">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-brand-header border-b border-brand-line text-[8px] font-bold uppercase sticky top-0 z-10">
-                        <th className="p-1 border-r border-brand-line w-[80px]">SKU</th>
-                        <th className="p-1 border-r border-brand-line">Product Name</th>
-                        <th className="p-1 border-r border-brand-line w-[90px]">Barcode</th>
-                        <th className="p-1 border-r border-brand-line w-[65px] text-right">Price</th>
-                        <th className="p-1 w-[50px] text-right">Stock</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                <div className="border rounded-md bg-background max-h-[200px] overflow-y-auto text-sm">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">SKU</TableHead>
+                        <TableHead>Product Name</TableHead>
+                        <TableHead className="w-[120px]">Barcode</TableHead>
+                        <TableHead className="w-[100px] text-right">Price</TableHead>
+                        <TableHead className="w-[80px] text-right">Stock</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {parsedProducts.slice(0, 50).map((p, i) => (
-                        <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                          <td className="p-1 border-r border-brand-line font-bold truncate">{p.sku}</td>
-                          <td className="p-1 border-r border-brand-line font-sans font-medium truncate max-w-[200px]">{p.name}</td>
-                          <td className="p-1 border-r border-brand-line truncate">
-                            {p.barcode ? p.barcode : <span className="text-amber-600 font-bold font-sans text-[8px] uppercase">Auto-Gen</span>}
-                          </td>
-                          <td className="p-1 border-r border-brand-line text-right font-bold text-gray-700">${parseFloat(p.selling_price || '0').toFixed(2)}</td>
-                          <td className="p-1 text-right text-gray-600">{p.stock_quantity}</td>
-                        </tr>
+                        <TableRow key={i}>
+                          <TableCell className="font-mono text-xs font-medium">{p.sku}</TableCell>
+                          <TableCell className="truncate max-w-[300px]">{p.name}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {p.barcode ? p.barcode : <Badge variant="warning" className="text-[10px] px-1.5 py-0 uppercase">Auto-Gen</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs">${parseFloat(p.selling_price || '0').toFixed(2)}</TableCell>
+                          <TableCell className="text-right">{p.stock_quantity}</TableCell>
+                        </TableRow>
                       ))}
                       {parsedProducts.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="p-4 text-center text-red-500 font-sans font-bold uppercase">
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-24 text-center text-red-500 font-medium">
                             No processable records. Please fix the validation errors above to import.
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
 
-              <div className="flex gap-2.5 pt-2 shrink-0">
-                <button 
-                  onClick={executeWizardImport}
-                  disabled={parsedProducts.length === 0}
-                  className="flex-1 bg-brand-accent text-white border border-brand-line py-2.5 text-xs uppercase font-bold cursor-pointer hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Confirm and Run Import
-                </button>
-                <button 
+              <div className="flex gap-3 pt-4 border-t mt-2">
+                <Button 
+                  variant="outline"
                   onClick={() => setIsImportWizardOpen(false)}
-                  className="border border-brand-line px-4 py-2.5 text-xs uppercase bg-white cursor-pointer hover:bg-gray-100"
+                  className="flex-1"
                 >
                   Cancel
-                </button>
+                </Button>
+                <Button 
+                  onClick={executeWizardImport}
+                  disabled={parsedProducts.length === 0}
+                  className="flex-1"
+                >
+                  Confirm and Run Import
+                </Button>
               </div>
 
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

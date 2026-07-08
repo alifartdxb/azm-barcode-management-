@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { 
   PackageSearch, AlertTriangle, Hash, TrendingUp, 
   DollarSign, ShoppingCart, Users, Receipt,
-  BarChart3, Activity, ArrowUpRight, ArrowDownRight, Package
+  BarChart3, Activity, ArrowUpRight, ArrowDownRight, Package,
+  FileText, Printer
 } from 'lucide-react';
 import { DashboardStats } from '../types';
 import { DashboardService } from '../services/DashboardService';
@@ -104,7 +105,34 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+        <Card className="col-span-4 lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <div className="text-sm text-muted-foreground">Fast access to common tasks</div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/products'}>
+                <Package className="h-6 w-6" />
+                <span className="text-xs font-medium">Add Product</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/billing'}>
+                <ShoppingCart className="h-6 w-6" />
+                <span className="text-xs font-medium">New Invoice</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/print'}>
+                <Printer className="h-6 w-6" />
+                <span className="text-xs font-medium">Print Labels</span>
+              </Button>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary">
+                <FileText className="h-6 w-6" />
+                <span className="text-xs font-medium">New Quotation</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-4 lg:col-span-5">
           <CardHeader>
             <CardTitle>Sales Overview</CardTitle>
           </CardHeader>

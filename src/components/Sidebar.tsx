@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, Printer, ScanBarcode, Coins, Users,
-  ChevronLeft, ChevronRight, Settings, HelpCircle, LogOut, Heart, Clock
+  ChevronLeft, ChevronRight, Settings, HelpCircle, LogOut, Heart, Clock,
+  FileText, ShoppingCart, Truck, Activity, Database, Shield, BarChart4
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -17,16 +18,22 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   const primaryLinks = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/products', label: 'Inventory & Products', icon: Package },
-    { to: '/print', label: 'Barcode Engine', icon: Printer },
-    { to: '/billing', label: 'POS & Billing', icon: Coins },
-    { to: '/partners', label: 'CRM & Partners', icon: Users },
-    { to: '/scanner', label: 'Scanner Tools', icon: ScanBarcode },
+    { to: '/products', label: 'Product Management', icon: Package },
+    { to: '/print', label: 'Barcode & Labels', icon: Printer },
+    { to: '/inventory', label: 'Inventory', icon: Database },
+    { to: '/billing', label: 'Sales & POS', icon: Coins },
+    { to: '/quotations', label: 'Quotations', icon: FileText },
+    { to: '/purchases', label: 'Purchase Orders', icon: ShoppingCart },
+    { to: '/partners', label: 'Customers', icon: Users },
+    { to: '/suppliers', label: 'Suppliers', icon: Truck },
+    { to: '/reports', label: 'Reports', icon: BarChart4 },
   ];
 
   const secondaryLinks = [
-    { to: '#', label: 'Settings', icon: Settings },
-    { to: '#', label: 'Help & Support', icon: HelpCircle },
+    { to: '/users', label: 'Users & Roles', icon: Shield },
+    { to: '/settings', label: 'Settings', icon: Settings },
+    { to: '/backup', label: 'Backup & Restore', icon: Database },
+    { to: '/logs', label: 'Activity Logs', icon: Activity },
   ];
 
   return (

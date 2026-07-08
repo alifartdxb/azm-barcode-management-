@@ -136,7 +136,7 @@ export default function Users() {
       </div>
 
       {isModalOpen && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-md shadow-2xl">
              <div className="px-6 py-4 border-b flex justify-between items-center">
                <h3 className="font-bold text-lg">Add User</h3>

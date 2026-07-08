@@ -98,16 +98,23 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         <nav className="flex flex-col gap-1 px-2 mt-auto">
           {secondaryLinks.map((link) => {
             const Icon = link.icon;
+            const isActive = location.pathname === link.to;
             return (
               <Link
                 key={link.label}
                 to={link.to}
                 title={!isOpen ? link.label : undefined}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors group text-muted-foreground hover:bg-muted hover:text-foreground"
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors relative group",
+                  isActive 
+                    ? "bg-primary/10 text-primary font-medium" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <Icon className="w-5 h-5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                {isActive && (
+                  <div className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary" />
+                )}
+                <Icon className={cn("w-5 h-5 shrink-0", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
                 {isOpen && <span className="truncate">{link.label}</span>}
               </Link>
             );

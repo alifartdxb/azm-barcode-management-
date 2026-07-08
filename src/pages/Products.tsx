@@ -858,13 +858,15 @@ export default function Products() {
 
       {/* SIDE DRAWER: Manual Add Product Form */}
       {isAddOpen && (
-        <div className="absolute inset-y-0 right-0 w-[420px] bg-background border-l shadow-2xl z-40 flex flex-col animate-in slide-in-from-right duration-300">
-          <div className="px-6 py-4 border-b flex justify-between items-center bg-card">
-            <h3 className="font-semibold text-lg">Add New Product</h3>
-            <Button variant="ghost" size="icon" onClick={() => setIsAddOpen(false)} className="h-8 w-8">
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity" onClick={() => setIsAddOpen(false)} />
+          <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-card">
+              <h3 className="font-semibold text-lg">Add New Product</h3>
+              <Button variant="ghost" size="icon" onClick={() => setIsAddOpen(false)} className="h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
 
           <form onSubmit={handleManualAddSubmit} className="flex-1 overflow-auto p-6 flex flex-col gap-5">
             {formError && (
@@ -1056,11 +1058,12 @@ export default function Products() {
             </div>
           </form>
         </div>
+        </>
       )}
 
       {/* CSV IMPORT WIZARD / AUDIT DIALOG */}
       {isImportWizardOpen && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-3xl shadow-2xl flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-card rounded-t-xl">
               <div className="flex items-center gap-3">

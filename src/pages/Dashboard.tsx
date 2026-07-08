@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   PackageSearch, AlertTriangle, Hash, TrendingUp, 
   DollarSign, ShoppingCart, Users, Receipt,
@@ -17,6 +18,7 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     noBarcode: 0,
@@ -44,8 +46,8 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" className="hidden md:flex">Download Report</Button>
-          <Button>Create Invoice</Button>
+          <Button variant="outline" className="hidden md:flex" onClick={() => navigate('/reports')}>Download Report</Button>
+          <Button onClick={() => navigate('/billing')}>Create Invoice</Button>
         </div>
       </div>
 
@@ -117,19 +119,19 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/products'}>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => navigate('/products')}>
                 <Package className="h-6 w-6" />
                 <span className="text-xs font-medium">Add Product</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/billing'}>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => navigate('/billing')}>
                 <ShoppingCart className="h-6 w-6" />
                 <span className="text-xs font-medium">New Invoice</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => window.location.href='/print'}>
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => navigate('/print')}>
                 <Printer className="h-6 w-6" />
                 <span className="text-xs font-medium">Print Labels</span>
               </Button>
-              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary">
+              <Button variant="outline" className="h-auto py-4 flex flex-col gap-2 items-center justify-center text-primary" onClick={() => navigate('/quotations')}>
                 <FileText className="h-6 w-6" />
                 <span className="text-xs font-medium">New Quotation</span>
               </Button>

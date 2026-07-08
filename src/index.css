@@ -2,7 +2,7 @@
 
 @layer theme {
   :root {
-    --background: #f5f7fa;
+    --background: #f8fafc;
     --foreground: #0f172a;
     
     --card: #ffffff;
@@ -11,30 +11,37 @@
     --popover: #ffffff;
     --popover-foreground: #0f172a;
     
-    --primary: #1e3a8a; /* Dark Blue */
+    --primary: #0f466b; /* Corporate Blue */
     --primary-foreground: #ffffff;
     
-    --secondary: #0d9488; /* Teal */
+    --secondary: #319ba4; /* Corporate Teal */
     --secondary-foreground: #ffffff;
     
     --muted: #f1f5f9;
-    --muted-foreground: #64748b;
+    --muted-foreground: #475569; /* Slate secondary text */
     
-    --accent: #22d3ee; /* Light Cyan */
+    --accent: #6fc7d3; /* Soft accent blue */
     --accent-foreground: #0f172a;
     
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
     
-    --border: #e5e7eb;
-    --input: #e5e7eb;
-    --ring: #1e3a8a;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #0f466b;
     
     --radius: 0.5rem;
+
+    /* Custom brand mappings */
+    --brand-ink: #0f466b;
+    --brand-sidebar: #f8fafc;
+    --brand-line: #e2e8f0;
+    --brand-header: #f1f5f9;
+    --brand-accent: #319ba4;
   }
 
   .dark {
-    --background: #0f172a; /* Dark Navy */
+    --background: #0f172a; /* Dark Navy Slate */
     --foreground: #f8fafc;
     
     --card: #1e293b;
@@ -43,24 +50,31 @@
     --popover: #1e293b;
     --popover-foreground: #f8fafc;
     
-    --primary: #3b82f6; /* Lighter blue for dark mode */
-    --primary-foreground: #ffffff;
+    --primary: #38bdf8; /* Vibrant cyan-blue for contrast on dark background */
+    --primary-foreground: #0f172a;
     
-    --secondary: #14b8a6; /* Teal */
-    --secondary-foreground: #ffffff;
+    --secondary: #2dd4bf;
+    --secondary-foreground: #0f172a;
     
     --muted: #334155;
     --muted-foreground: #94a3b8;
     
-    --accent: #22d3ee; /* Light Cyan */
+    --accent: #6fc7d3;
     --accent-foreground: #0f172a;
     
-    --destructive: #7f1d1d;
-    --destructive-foreground: #f8fafc;
+    --destructive: #f87171;
+    --destructive-foreground: #ffffff;
     
     --border: #334155;
     --input: #334155;
-    --ring: #3b82f6;
+    --ring: #38bdf8;
+
+    /* Custom brand mappings for dark mode */
+    --brand-ink: #38bdf8;
+    --brand-sidebar: #0f172a;
+    --brand-line: #334155;
+    --brand-header: #1e293b;
+    --brand-accent: #6fc7d3;
   }
 }
 
@@ -92,6 +106,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-sidebar: var(--brand-sidebar);
+  --color-brand-line: var(--brand-line);
+  --color-brand-header: var(--brand-header);
+  --color-brand-accent: var(--brand-accent);
   
   --radius: var(--radius);
 

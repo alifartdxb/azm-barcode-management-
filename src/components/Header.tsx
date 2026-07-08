@@ -20,6 +20,32 @@ export function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDark, setIsDark] = useState(false);
   const [date, setDate] = useState(new Date());
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
+
+    const handleUserChange = () => {
+      const u = localStorage.getItem('currentUser');
+      setCurrentUser(u ? JSON.parse(u) : null);
+    };
+
+    window.addEventListener('storage', handleUserChange);
+    window.addEventListener('user-login-change', handleUserChange);
+    return () => {
+      window.removeEventListener('storage', handleUserChange);
+      window.removeEventListener('user-login-change', handleUserChange);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    window.dispatchEvent(new Event('user-login-change'));
+    navigate('/');
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setDate(new Date()), 60000);
@@ -110,9 +136,39 @@ export function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
             <span>New Item</span>
           </Button>
 
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full ml-1 p-0 flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20">
-            <User className="h-4 w-4" />
-          </Button>
+          <div className="relative group">
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full ml-1 p-0 overflow-hidden border border-border flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
+              {currentUser?.profilePic ? (
+                <img src={currentUser.profilePic} alt={currentUser.name} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <User className="h-4 w-4" />
+              )}
+            </Button>
+            
+            <div className="absolute right-0 top-full mt-2 w-56 bg-card border rounded-lg shadow-xl py-2 opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto transition-all z-50 duration-200">
+              <div className="px-4 py-2 border-b">
+                <p className="text-sm font-semibold text-foreground truncate">{currentUser?.name || 'Staff User'}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{currentUser?.email || 'sales@alzahrabm.com'}</p>
+                <Badge variant="outline" className="mt-1 text-[9px] uppercase tracking-wider font-bold bg-primary/10 text-primary border-primary/20">
+                  {currentUser?.role || 'Guest'}
+                </Badge>
+              </div>
+              <div className="px-4 py-2 text-[11px] text-muted-foreground space-y-1">
+                <p><strong>Branch:</strong> {currentUser?.branch || 'Sharjah Branch'}</p>
+                <p><strong>Dept:</strong> {currentUser?.department || 'Sales'}</p>
+              </div>
+              <div className="border-t mt-2 pt-2 px-2">
+                <Button 
+                  onClick={handleLogout} 
+                  variant="destructive" 
+                  size="sm" 
+                  className="w-full h-8 text-xs font-bold bg-red-600 hover:bg-red-500 text-white"
+                >
+                  Secure Logout
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>

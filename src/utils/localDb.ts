@@ -1,5 +1,6 @@
 import { db } from '../db/db';
 import { Product, Customer, Supplier, Invoice, DashboardStats, Quotation, PurchaseOrder } from '../types';
+import { formatCurrency } from './currency';
 
 export async function localGetProducts(): Promise<Product[]> {
   return db.products.toArray();
@@ -404,7 +405,7 @@ export async function localGetDashboardStats(): Promise<DashboardStats> {
   const recentTransactions = sortedInvoices.slice(0, 5).map(inv => ({
     name: inv.customer_name || 'Walk-in Customer',
     email: inv.customer_name ? 'Registered Customer' : 'No Email',
-    amount: `+$${(inv.grand_total || 0).toFixed(2)}`,
+    amount: `+${formatCurrency(inv.grand_total || 0)}`,
     status: inv.payment_status || 'Paid'
   }));
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
+import { formatCurrency } from '../utils/currency';
 import { 
   BarChart4, Download, FileText, PieChart, TrendingUp, Calendar, AlertTriangle
 } from 'lucide-react';
@@ -39,7 +40,7 @@ export default function Reports() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50">
-                <ReportItem title="Daily Sales Summary" desc={`Total Recorded Revenue: $${totalRevenue.toFixed(2)}`} />
+                <ReportItem title="Daily Sales Summary" desc={`Total Recorded Revenue: ${formatCurrency(totalRevenue)}`} />
                 <ReportItem title="Monthly Revenue Analysis" desc="Month-over-month growth and trend analysis." />
                 <ReportItem title="Customer Purchase History" desc="Sales grouped by customer account." />
               </div>

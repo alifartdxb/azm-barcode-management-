@@ -15,6 +15,7 @@ export class ERPDatabase extends Dexie {
   customerFollowups!: Table<any, number>;
   whatsappTemplates!: Table<any, number>;
   whatsappCampaigns!: Table<any, number>;
+  auditLogs!: Table<any, number>;
 
   constructor() {
     super('OfflineERPDB');
@@ -36,6 +37,10 @@ export class ERPDatabase extends Dexie {
       customerFollowups: '++id, customer_id, type, date, status',
       whatsappTemplates: '++id, name, type',
       whatsappCampaigns: '++id, name, status'
+    });
+    this.version(4).stores({
+      users: '++id, name, email, username, role, status',
+      auditLogs: '++id, username, action, timestamp, module, severity'
     });
   
   }

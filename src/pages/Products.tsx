@@ -7,6 +7,7 @@ import {
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { Product } from '../types';
+import { formatCurrency } from '../utils/currency';
 import { validateBarcode, generateLocalEan13 } from '../utils/barcode';
 import { ProductService } from '../services/ProductService';
 import { Button } from '../components/ui/button';
@@ -840,7 +841,7 @@ export default function Products() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium text-sm">
-                        ${p.selling_price.toFixed(2)}
+                        {formatCurrency(p.selling_price)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant={p.stock_quantity > 10 ? 'success' : 'destructive'} className="font-mono text-xs">
@@ -963,7 +964,7 @@ export default function Products() {
 
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Retail Price ($)</label>
+                <label className="text-sm font-medium">Retail Price (AED)</label>
                 <Input 
                   type="number" 
                   step="0.01"
@@ -974,7 +975,7 @@ export default function Products() {
               </div>
               
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Cost Price ($)</label>
+                <label className="text-sm font-medium">Cost Price (AED)</label>
                 <Input 
                   type="number" 
                   step="0.01"
@@ -1216,7 +1217,7 @@ export default function Products() {
                           <TableCell className="font-mono text-xs">
                             {p.barcode ? p.barcode : <Badge variant="warning" className="text-[10px] px-1.5 py-0 uppercase">Auto-Gen</Badge>}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-xs">${parseFloat(p.selling_price || '0').toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">{formatCurrency(p.selling_price)}</TableCell>
                           <TableCell className="text-right">{p.stock_quantity}</TableCell>
                         </TableRow>
                       ))}

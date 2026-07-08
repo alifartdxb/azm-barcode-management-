@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { localSaveQuotation, localDeleteQuotation } from '../utils/localDb';
+import { formatCurrency } from '../utils/currency';
 import { 
   FileText, Plus, Search, Filter, Download, MoreHorizontal,
   Clock, CheckCircle2, XCircle, X
@@ -96,7 +97,7 @@ export default function Quotations() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground font-medium mb-2">Pending Value</p>
-            <p className="text-3xl font-bold text-amber-600">${pendingValue.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-amber-600">{formatCurrency(pendingValue)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -150,7 +151,7 @@ export default function Quotations() {
                     <TableCell className="font-mono text-sm font-medium text-primary">{quote.quotation_number}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="font-medium">{quote.customer_name}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">${(quote.grand_total || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatCurrency(quote.grand_total || 0)}</TableCell>
                     <TableCell>
                       {quote.status === 'approved' && (
                         <Badge variant="success" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 gap-1.5"><CheckCircle2 className="w-3 h-3" /> Approved</Badge>

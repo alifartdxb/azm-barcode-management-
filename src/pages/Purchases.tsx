@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { localSavePurchase, localDeletePurchase } from '../utils/localDb';
+import { formatCurrency } from '../utils/currency';
 import { 
   ShoppingCart, Plus, Search, Filter, Download, MoreHorizontal,
   Truck, CheckCircle2, Clock, X
@@ -93,7 +94,7 @@ export default function Purchases() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground font-medium mb-2">Value (Incoming)</p>
-            <p className="text-3xl font-bold">${pendingValue.toFixed(2)}</p>
+            <p className="text-3xl font-bold">{formatCurrency(pendingValue)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -149,7 +150,7 @@ export default function Purchases() {
                     <TableCell className="text-sm text-muted-foreground">{new Date(po.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="font-medium">{po.supplier_name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{po.expected_date}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">${(po.total_amount || 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{formatCurrency(po.total_amount || 0)}</TableCell>
                     <TableCell>
                       {po.status === 'ordered' && (
                         <Badge variant="warning" className="gap-1.5"><Clock className="w-3 h-3" /> Ordered</Badge>

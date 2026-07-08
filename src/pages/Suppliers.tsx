@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { localSaveSupplier, localDeleteSupplier } from '../utils/localDb';
+import { formatCurrency } from '../utils/currency';
 import { 
   Truck, Plus, Search, Filter, Download, MoreHorizontal,
   Mail, Phone, X
@@ -125,7 +126,7 @@ export default function Suppliers() {
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                       ${(supplier.balance || 0).toFixed(2)}
+                       {formatCurrency(supplier.balance || 0)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

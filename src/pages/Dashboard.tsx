@@ -6,6 +6,7 @@ import {
   BarChart3, Activity, ArrowUpRight, ArrowDownRight, Package,
   FileText, Printer
 } from 'lucide-react';
+import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import { DashboardStats } from '../types';
 import { DashboardService } from '../services/DashboardService';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -58,7 +59,7 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalSales)}</div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <span className="text-green-500 flex items-center mr-1">
                 <ArrowUpRight className="h-3 w-3" /> All Time
@@ -155,7 +156,7 @@ export default function Dashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${getCurrencySymbol()} ${value.toLocaleString()}`} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: 'var(--radius)' }}
                     itemStyle={{ color: 'var(--foreground)' }}

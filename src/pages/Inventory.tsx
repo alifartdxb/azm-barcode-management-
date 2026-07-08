@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
+import { formatCurrency } from '../utils/currency';
 import { 
   Search, Plus, Filter, Download, ArrowUpDown, MoreHorizontal,
   PackageCheck, AlertTriangle, ArrowRightLeft, Edit2, X, CheckCircle2
@@ -142,8 +143,8 @@ export default function Inventory() {
                         <TableCell className="font-mono text-xs font-medium">{product.sku}</TableCell>
                         <TableCell className="font-medium max-w-[250px] truncate">{product.name}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">{product.category || '—'}</TableCell>
-                        <TableCell className="text-right font-mono text-xs">${(product.cost_price || 0).toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-xs">${value.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(product.cost_price || 0)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(value)}</TableCell>
                         <TableCell className="text-right font-mono text-sm font-semibold">
                           {editingStock === product.id ? (
                             <div className="flex items-center justify-end gap-1">

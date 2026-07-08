@@ -22,6 +22,7 @@ import Backup from './pages/Backup';
 import Logs from './pages/Logs';
 import { Layout } from './components/Layout';
 import { Footer } from './components/Footer';
+import NotFound from './pages/NotFound';
 
 function AppContent() {
   return (
@@ -43,6 +44,7 @@ function AppContent() {
         <Route path="/backup" element={<Backup />} />
         <Route path="/logs" element={<Logs />} />
       </Route>
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

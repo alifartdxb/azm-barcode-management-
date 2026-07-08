@@ -127,36 +127,28 @@ export async function localBulkImportProducts(
         finalProduct = {
           ...existingItem,
           name: p.name ? String(p.name).trim() : existingItem.name,
-          name_ar: p.name_ar !== undefined ? String(p.name_ar).trim() : existingItem.name_ar,
           brand: p.brand !== undefined ? String(p.brand).trim() : existingItem.brand,
           category: p.category !== undefined ? String(p.category).trim() : existingItem.category,
-          subcategory: p.subcategory !== undefined ? String(p.subcategory).trim() : existingItem.subcategory,
           unit: p.unit !== undefined ? String(p.unit).trim() : existingItem.unit,
           selling_price: p.selling_price !== undefined ? parseFloat(p.selling_price) || 0 : existingItem.selling_price,
           cost_price: p.cost_price !== undefined ? parseFloat(p.cost_price) || 0 : existingItem.cost_price,
           vat: p.vat !== undefined ? parseFloat(p.vat) || 0 : existingItem.vat,
           supplier: p.supplier !== undefined ? String(p.supplier).trim() : existingItem.supplier,
           stock_quantity: p.stock_quantity !== undefined ? parseInt(p.stock_quantity, 10) || 0 : existingItem.stock_quantity,
-          description: p.description !== undefined ? String(p.description).trim() : existingItem.description,
-          status: p.status !== undefined ? String(p.status).trim() : existingItem.status,
         };
       } else {
         finalProduct = {
           sku: skuKey,
           barcode: barcode,
           name: p.name ? String(p.name).trim() : 'Unknown Product',
-          name_ar: p.name_ar ? String(p.name_ar).trim() : '',
           brand: p.brand ? String(p.brand).trim() : '',
           category: p.category ? String(p.category).trim() : '',
-          subcategory: p.subcategory ? String(p.subcategory).trim() : '',
           unit: p.unit ? String(p.unit).trim() : 'pcs',
           selling_price: parseFloat(p.selling_price) || 0,
           cost_price: parseFloat(p.cost_price) || 0,
           vat: parseFloat(p.vat) || 0,
           supplier: p.supplier ? String(p.supplier).trim() : '',
           stock_quantity: parseInt(p.stock_quantity, 10) || 0,
-          description: p.description ? String(p.description).trim() : '',
-          status: p.status ? String(p.status).trim() : 'Active',
         };
       }
 
@@ -271,7 +263,7 @@ export async function localUpdateProductStock(productId: number, newStock: numbe
 
 
 const DEFAULT_CUSTOMERS: Customer[] = [
-  { name: 'Cash Customer', phone: '0501234567', email: 'cash@alrehab.com', trn: '', address: 'Deira, Dubai, UAE', balance: 0.0 },
+  { name: 'Cash Customer', phone: '0501234567', email: 'cash@alzahrabm.com', trn: '', address: 'Industrial Area, Al Sajaa, Sharjah, U.A.E.', balance: 0.0 },
   { name: 'Al Sahel Contracting LLC', phone: '042233445', email: 'info@alsahel.ae', trn: '100234567800003', address: 'Al Quoz, Dubai, UAE', balance: 5420.50 },
   { name: 'Emirates Heights Builders', phone: '0569876543', email: 'contact@ehbuilders.ae', trn: '100456789100003', address: 'Sharjah, UAE', balance: 0.0 }
 ];

@@ -30,17 +30,14 @@ export default function Products() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newSku, setNewSku] = useState('');
   const [newName, setNewName] = useState('');
-  const [newNameAr, setNewNameAr] = useState('');
   const [newBrand, setNewBrand] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [newSubcategory, setNewSubcategory] = useState('');
   const [newUnit, setNewUnit] = useState('pcs');
   const [newPrice, setNewPrice] = useState('0.00');
   const [newCost, setNewCost] = useState('0.00');
   const [newVat, setNewVat] = useState('5.0');
   const [newSupplier, setNewSupplier] = useState('');
   const [newStock, setNewStock] = useState('0');
-  const [newDesc, setNewDesc] = useState('');
   const [newBarcode, setNewBarcode] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -121,18 +118,14 @@ export default function Products() {
       sku: newSku.trim(),
       barcode: newBarcode.trim(),
       name: newName.trim(),
-      name_ar: newNameAr.trim(),
       brand: newBrand.trim(),
       category: newCategory.trim(),
-      subcategory: newSubcategory.trim(),
       unit: newUnit,
       selling_price: parseFloat(newPrice) || 0,
       cost_price: parseFloat(newCost) || 0,
       vat: parseFloat(newVat) || 0,
       supplier: newSupplier.trim(),
       stock_quantity: parseInt(newStock, 10) || 0,
-      description: newDesc.trim(),
-      status: 'Active'
     };
 
     try {
@@ -145,16 +138,13 @@ export default function Products() {
       // Reset form
       setNewSku('');
       setNewName('');
-      setNewNameAr('');
       setNewBrand('');
       setNewCategory('');
-      setNewSubcategory('');
       setNewPrice('0.00');
       setNewCost('0.00');
       setNewVat('5.0');
       setNewSupplier('');
       setNewStock('0');
-      setNewDesc('');
       setNewBarcode('');
       fetchProducts();
     } catch (err: any) {
@@ -180,18 +170,14 @@ export default function Products() {
       SKU: p.sku,
       Barcode: p.barcode || '',
       Name: p.name,
-      'Arabic Name': p.name_ar || '',
       Brand: p.brand || '',
       Category: p.category || '',
-      Subcategory: p.subcategory || '',
       Unit: p.unit || 'pcs',
       'Selling Price (AED)': p.selling_price,
       'Cost Price (AED)': p.cost_price,
       'VAT (%)': p.vat,
       Supplier: p.supplier || '',
       'Stock Quantity': p.stock_quantity,
-      Description: p.description || '',
-      Status: p.status || 'Active'
     }));
 
     const csv = Papa.unparse(cleanData);
@@ -215,18 +201,14 @@ export default function Products() {
       SKU: p.sku,
       Barcode: p.barcode || '',
       Name: p.name,
-      'Arabic Name': p.name_ar || '',
       Brand: p.brand || '',
       Category: p.category || '',
-      Subcategory: p.subcategory || '',
       Unit: p.unit || 'pcs',
       'Selling Price (AED)': p.selling_price,
       'Cost Price (AED)': p.cost_price,
       'VAT (%)': p.vat,
       Supplier: p.supplier || '',
       'Stock Quantity': p.stock_quantity,
-      Description: p.description || '',
-      Status: p.status || 'Active'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
@@ -250,7 +232,6 @@ export default function Products() {
       { field: 'VAT (%)', keys: ['vat', 'VAT', 'VAT (%)'] },
       { field: 'Stock Level', keys: ['stock_quantity', 'Stock', 'Quantity', 'Stock Quantity'] },
       { field: 'Supplier', keys: ['supplier', 'Supplier'] },
-      { field: 'Description', keys: ['description', 'Description'] }
     ];
 
     detectedHeaders.forEach(header => {
@@ -475,18 +456,14 @@ export default function Products() {
               sku: getVal(row.sku || row.SKU || row.Sku || ''),
               barcode: getVal(row.barcode || row.Barcode || row.BarcodeNo || ''),
               name: getVal(row.name || row.Name || row['Product Name'] || row.product_name || 'Unknown Product'),
-              name_ar: getVal(row.name_ar || row['Arabic Name'] || row.arabic_name || ''),
               brand: getVal(row.brand || row.Brand || ''),
               category: getVal(row.category || row.Category || ''),
-              subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
               selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || row.sellingPrice || '0') || 0,
               cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || row.costPrice || '0') || 0,
               vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
               stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
-              description: getVal(row.description || row.Description || ''),
-              status: getVal(row.status || row.Status || 'Active')
             };
           });
 
@@ -513,18 +490,14 @@ export default function Products() {
               sku: getVal(row.sku || row.SKU || row.Sku || ''),
               barcode: getVal(row.barcode || row.Barcode || row.BarcodeNo || ''),
               name: getVal(row.name || row.Name || row['Product Name'] || row.product_name || 'Unknown Product'),
-              name_ar: getVal(row.name_ar || row['Arabic Name'] || row.arabic_name || ''),
               brand: getVal(row.brand || row.Brand || ''),
               category: getVal(row.category || row.Category || ''),
-              subcategory: getVal(row.subcategory || row.Subcategory || ''),
               unit: getVal(row.unit || row.Unit || 'pcs'),
               selling_price: parseFloat(row.selling_price || row['Selling Price'] || row['Selling Price (AED)'] || row.sellingPrice || '0') || 0,
               cost_price: parseFloat(row.cost_price || row['Cost Price'] || row['Cost Price (AED)'] || row.costPrice || '0') || 0,
               vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
               stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
-              description: getVal(row.description || row.Description || ''),
-              status: getVal(row.status || row.Status || 'Active')
             };
           });
 
@@ -840,7 +813,7 @@ export default function Products() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{p.name}</span>
-                          {p.name_ar && <span className="text-xs text-muted-foreground mt-0.5">{p.name_ar}</span>}
+                          
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{p.category || '-'}</TableCell>
@@ -942,17 +915,7 @@ export default function Products() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Arabic Name (Optional)</label>
-              <Input 
-                type="text" 
-                value={newNameAr}
-                onChange={(e) => setNewNameAr(e.target.value)}
-                placeholder="اسم المنتج باللغة العربية"
-                dir="rtl"
-                className="font-medium"
-              />
-            </div>
+            
 
             <div className="border rounded-md p-4 bg-muted/30 space-y-3">
               <div className="flex justify-between items-center">
@@ -1073,16 +1036,7 @@ export default function Products() {
               </div>
             </div>
 
-            <div className="space-y-1.5 pb-4">
-              <label className="text-sm font-medium">Item Description</label>
-              <textarea 
-                rows={2}
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Hardware specifications, grade ratings, or placement coordinates..."
-                className="w-full flex min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
+            
 
             <div className="mt-auto pt-4 flex gap-3 border-t">
               <Button 

@@ -17,7 +17,6 @@ export default function Partners() {
   // Form State (Single shared form for create/edit)
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formName, setFormName] = useState('');
-  const [formNameAr, setFormNameAr] = useState('');
   const [formContactPerson, setFormContactPerson] = useState(''); // Suppliers only
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -50,7 +49,6 @@ export default function Partners() {
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormName('');
-    setFormNameAr('');
     setFormContactPerson('');
     setFormPhone('');
     setFormEmail('');
@@ -64,8 +62,7 @@ export default function Partners() {
   const handleOpenEdit = (partner: any) => {
     setEditingId(partner.id);
     setFormName(partner.name);
-    setFormNameAr(partner.name_ar || '');
-    setFormContactPerson(partner.contact_person || '');
+        setFormContactPerson(partner.contact_person || '');
     setFormPhone(partner.phone || '');
     setFormEmail(partner.email || '');
     setFormTrn(partner.trn || '');
@@ -85,8 +82,7 @@ export default function Partners() {
 
     const payload: any = {
       name: formName.trim(),
-      name_ar: formNameAr.trim(),
-      phone: formPhone.trim(),
+            phone: formPhone.trim(),
       email: formEmail.trim(),
       trn: formTrn.trim(),
       address: formAddress.trim(),
@@ -136,15 +132,13 @@ export default function Partners() {
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.name_ar && c.name_ar.includes(searchQuery)) ||
-    (c.phone && c.phone.includes(searchQuery)) ||
+        (c.phone && c.phone.includes(searchQuery)) ||
     (c.trn && c.trn.includes(searchQuery))
   );
 
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.name_ar && s.name_ar.includes(searchQuery)) ||
-    (s.contact_person && s.contact_person.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (s.contact_person && s.contact_person.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (s.phone && s.phone.includes(searchQuery)) ||
     (s.trn && s.trn.includes(searchQuery))
   );
@@ -218,7 +212,7 @@ export default function Partners() {
                       <div className="flex justify-between items-start border-b border-dashed border-gray-100 pb-2 mb-2">
                         <div>
                           <h3 className="font-sans font-black text-sm text-brand-ink leading-tight">{c.name}</h3>
-                          {c.name_ar && <span className="text-[10px] text-gray-500 font-sans">{c.name_ar}</span>}
+                          
                         </div>
                         <span className="bg-gray-100 border border-gray-200 text-gray-600 text-[9px] px-1 font-mono uppercase">
                           CUST-{c.id}
@@ -289,7 +283,7 @@ export default function Partners() {
                       <div className="flex justify-between items-start border-b border-dashed border-gray-100 pb-2 mb-2">
                         <div>
                           <h3 className="font-sans font-black text-sm text-brand-ink leading-tight">{s.name}</h3>
-                          {s.name_ar && <span className="text-[10px] text-gray-500 font-sans">{s.name_ar}</span>}
+                          
                         </div>
                         <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[9px] px-1 font-mono uppercase">
                           SUPP-{s.id}
@@ -397,16 +391,7 @@ export default function Partners() {
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">Arabic translation name (optional)</label>
-                <input 
-                  type="text"
-                  placeholder="e.g. مؤسسة الخليج للمقاولات"
-                  value={formNameAr}
-                  onChange={(e) => setFormNameAr(e.target.value)}
-                  className="w-full border border-brand-line px-3 py-1.5 bg-[#fafafa] text-right"
-                />
-              </div>
+              
 
               {activeTab === 'suppliers' && (
                 <div>

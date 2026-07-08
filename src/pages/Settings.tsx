@@ -86,6 +86,10 @@ export default function Settings() {
                   <label className="text-sm font-medium">Email Address</label>
                   <Input value={settings?.company_email || ''} onChange={e => updateField('company_email', e.target.value)} />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Website</label>
+                  <Input value={settings?.company_website || ''} onChange={e => updateField('company_website', e.target.value)} />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">TRN / Tax Registration Number</label>

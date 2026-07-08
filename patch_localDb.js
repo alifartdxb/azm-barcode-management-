@@ -2,23 +2,14 @@ import fs from 'fs';
 
 let code = fs.readFileSync('src/utils/localDb.ts', 'utf8');
 
-const target = `  const [totalProducts, noBarcode, lowStock, allInvoices, allCustomers, totalQuotations, totalPurchases] = await Promise.all([
-    db.products.count(),
-    db.products.filter(p => !p.barcode || p.barcode.trim() === '').count(),
-    db.products.filter(p => p.stock_quantity < 10).count(),
-    db.invoices.toArray(),
-    db.customers.toArray()
-  ]);`;
+code = code.replace(/          name_ar: p\.name_ar !== undefined \? String\(p\.name_ar\)\.trim\(\) : existingItem\.name_ar,\n/g, '');
+code = code.replace(/          subcategory: p\.subcategory !== undefined \? String\(p\.subcategory\)\.trim\(\) : existingItem\.subcategory,\n/g, '');
+code = code.replace(/          description: p\.description !== undefined \? String\(p\.description\)\.trim\(\) : existingItem\.description,\n/g, '');
+code = code.replace(/          status: p\.status !== undefined \? String\(p\.status\)\.trim\(\) : existingItem\.status,\n/g, '');
 
-const replacement = `  const [totalProducts, noBarcode, lowStock, allInvoices, allCustomers, totalQuotations, totalPurchases] = await Promise.all([
-    db.products.count(),
-    db.products.filter(p => !p.barcode || p.barcode.trim() === '').count(),
-    db.products.filter(p => p.stock_quantity < 10).count(),
-    db.invoices.toArray(),
-    db.customers.toArray(),
-    db.quotations.count(),
-    db.purchaseOrders.count()
-  ]);`;
+code = code.replace(/          name_ar: p\.name_ar \? String\(p\.name_ar\)\.trim\(\) : '',\n/g, '');
+code = code.replace(/          subcategory: p\.subcategory \? String\(p\.subcategory\)\.trim\(\) : '',\n/g, '');
+code = code.replace(/          description: p\.description \? String\(p\.description\)\.trim\(\) : '',\n/g, '');
+code = code.replace(/          status: p\.status \? String\(p\.status\)\.trim\(\) : 'Active',\n/g, '');
 
-code = code.replace(target, replacement);
 fs.writeFileSync('src/utils/localDb.ts', code);

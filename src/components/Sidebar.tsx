@@ -50,7 +50,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <span className="text-primary-foreground font-black tracking-tighter text-sm">AZM</span>
           </div>
           {isOpen && (
-            <span className="font-bold text-lg tracking-tight truncate">Enterprise ERP</span>
+            <span className="font-bold text-lg tracking-tight truncate">AL Zahra Al Malakia</span>
           )}
         </div>
       </div>

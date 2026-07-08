@@ -66,14 +66,12 @@ export default function PrintLabels() {
   // Visual Designer options
   const [showGuidelines, setShowGuidelines] = useState(true);
   const [showHeader, setShowHeader] = useState(true);
-  const [headerText, setHeaderText] = useState('AL REHAB BUILDING MATERIALS');
+  const [headerText, setHeaderText] = useState('AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)');
   const [headerFontSize, setHeaderFontSize] = useState(7);
   
   const [showName, setShowName] = useState(true);
   const [nameFontSize, setNameFontSize] = useState(9);
   
-  const [showArabic, setShowArabic] = useState(true);
-  const [arabicFontSize, setArabicFontSize] = useState(8);
   
   const [showPrice, setShowPrice] = useState(true);
   const [priceFontSize, setPriceFontSize] = useState(11);
@@ -487,23 +485,14 @@ export default function PrintLabels() {
                       />
                       Store Header Text
                     </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-400">Font:</span>
-                      <input 
-                        type="number"
-                        value={headerFontSize}
-                        onChange={(e) => setHeaderFontSize(parseInt(e.target.value, 10) || 6)}
-                        className="w-10 border border-brand-line text-center text-[10px] font-mono p-0.5"
-                      />
-                      <span className="text-[9px] text-gray-400">pt</span>
-                    </div>
+                    
                   </div>
                   <input 
                     type="text"
                     value={headerText}
                     disabled={!showHeader}
                     onChange={(e) => setHeaderText(e.target.value)}
-                    placeholder="e.g. AL REHAB BUILDING MATERIALS"
+                    placeholder="e.g. AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)"
                     className="w-full border border-brand-line px-2 py-1 text-xs font-bold disabled:bg-gray-100"
                   />
                 </div>
@@ -520,41 +509,15 @@ export default function PrintLabels() {
                       />
                       English Title
                     </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-400">Font:</span>
-                      <input 
-                        type="number"
-                        value={nameFontSize}
-                        onChange={(e) => setNameFontSize(parseInt(e.target.value, 10) || 6)}
-                        className="w-10 border border-brand-line text-center text-[10px] font-mono p-0.5"
-                      />
-                      <span className="text-[9px] text-gray-400">pt</span>
-                    </div>
+                    
                   </div>
                 </div>
 
                 {/* Arabic Title Style */}
                 <div className="bg-white border border-brand-line p-3 flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase">
-                      <input 
-                        type="checkbox"
-                        checked={showArabic}
-                        onChange={(e) => setShowArabic(e.target.checked)}
-                        className="accent-brand-ink"
-                      />
-                      Arabic Title Name (name_ar)
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-400">Font:</span>
-                      <input 
-                        type="number"
-                        value={arabicFontSize}
-                        onChange={(e) => setArabicFontSize(parseInt(e.target.value, 10) || 6)}
-                        className="w-10 border border-brand-line text-center text-[10px] font-mono p-0.5"
-                      />
-                      <span className="text-[9px] text-gray-400">pt</span>
-                    </div>
+                    
+                    
                   </div>
                 </div>
 
@@ -570,16 +533,7 @@ export default function PrintLabels() {
                       />
                       Retail Price Indicator
                     </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-400">Font:</span>
-                      <input 
-                        type="number"
-                        value={priceFontSize}
-                        onChange={(e) => setPriceFontSize(parseInt(e.target.value, 10) || 6)}
-                        className="w-10 border border-brand-line text-center text-[10px] font-mono p-0.5"
-                      />
-                      <span className="text-[9px] text-gray-400">pt</span>
-                    </div>
+                    
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -625,16 +579,7 @@ export default function PrintLabels() {
                       />
                       Product SKU
                     </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[9px] text-gray-400">Font:</span>
-                      <input 
-                        type="number"
-                        value={skuFontSize}
-                        onChange={(e) => setSkuFontSize(parseInt(e.target.value, 10) || 6)}
-                        className="w-10 border border-brand-line text-center text-[10px] font-mono p-0.5"
-                      />
-                      <span className="text-[9px] text-gray-400">pt</span>
-                    </div>
+                    
                   </div>
                 </div>
 
@@ -967,14 +912,6 @@ export default function PrintLabels() {
                                     {product.name}
                                   </div>
                                 )}
-                                {showArabic && product.name_ar && (
-                                  <div 
-                                    className="font-bold truncate text-gray-800 text-right w-full"
-                                    style={{ fontSize: `${arabicFontSize}pt`, direction: 'rtl', lineHeight: 1.1 }}
-                                  >
-                                    {product.name_ar}
-                                  </div>
-                                )}
                               </div>
 
                               {/* Price Tag Column */}
@@ -1034,10 +971,9 @@ export default function PrintLabels() {
                           {showSku && (
                             <div className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 text-[6pt] font-mono leading-none">
                               <span>SKU: <strong className="text-black">{product.sku}</strong></span>
-                              <span>QTY: 1</span>
+                              <span>MFR STICKER</span>
                             </div>
                           )}
-
                         </div>
                       );
                     })}
@@ -1088,14 +1024,7 @@ export default function PrintLabels() {
                               {product.name}
                             </div>
                           )}
-                          {showArabic && product.name_ar && (
-                            <div 
-                              className="font-bold truncate text-gray-800 text-right w-full"
-                              style={{ fontSize: `${arabicFontSize}pt`, direction: 'rtl', lineHeight: 1.1 }}
-                            >
-                              {product.name_ar}
-                            </div>
-                          )}
+                          
                         </div>
 
                         {/* Price Tag Column */}

@@ -3,10 +3,8 @@ export interface Product {
   sku: string;
   barcode: string;
   name: string;
-  name_ar?: string;
   brand?: string;
   category?: string;
-  subcategory?: string;
   unit?: string;
   cost_price: number;
   selling_price: number;
@@ -15,8 +13,6 @@ export interface Product {
   warehouse_location?: string;
   minimum_stock?: number;
   stock_quantity: number;
-  description?: string;
-  status: string; // 'Active', 'Inactive'
   image_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -129,6 +125,7 @@ export interface AppSettings {
   company_address?: string;
   company_phone?: string;
   company_email?: string;
+  company_website?: string;
   invoice_prefix: string;
   quotation_prefix: string;
   currency: string;

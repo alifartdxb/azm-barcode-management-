@@ -156,7 +156,7 @@ export default function Billing() {
     try {
       await CustomerService.save({
         name: newCustName.trim(),
-        name_ar: newCustNameAr.trim(),
+        
         phone: newCustPhone.trim(),
         trn: newCustTrn.trim(),
         address: newCustAddress.trim(),
@@ -461,7 +461,7 @@ export default function Billing() {
                       >
                         <div>
                           <strong className="text-brand-ink">{p.name}</strong>
-                          {p.name_ar && <span className="text-gray-500 font-sans mr-2"> / {p.name_ar}</span>}
+                          
                           <div className="text-[10px] font-mono text-gray-400">SKU: {p.sku} | Barcode: {p.barcode || 'N/A'}</div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -516,9 +516,7 @@ export default function Billing() {
                           <tr key={item.product.id} className="hover:bg-brand-bg group">
                             <td className="p-2 pl-3">
                               <div className="font-bold text-brand-ink truncate max-w-[200px] sm:max-w-xs">{item.product.name}</div>
-                              {item.product.name_ar && (
-                                <div className="text-[10px] text-gray-500 font-sans truncate" direction="rtl">{item.product.name_ar}</div>
-                              )}
+                              
                               <div className="text-[9px] font-mono text-gray-400">
                                 SKU: {item.product.sku} | Barcode: {item.product.barcode || 'N/A'}
                               </div>
@@ -651,7 +649,7 @@ export default function Billing() {
                 {selectedCustomer && (
                   <div className="mt-2.5 bg-gray-50 border border-gray-100 p-2 text-[10px] font-mono text-gray-600">
                     <div className="font-bold text-brand-ink">CRM File: #{selectedCustomer.id}</div>
-                    {selectedCustomer.name_ar && <div>Arabic: {selectedCustomer.name_ar}</div>}
+                    
                     {selectedCustomer.phone && <div>Phone: {selectedCustomer.phone}</div>}
                     {selectedCustomer.trn && <div>TRN: <span className="font-bold text-blue-700">{selectedCustomer.trn}</span></div>}
                     {selectedCustomer.address && <div className="truncate">Addr: {selectedCustomer.address}</div>}
@@ -1026,11 +1024,11 @@ export default function Billing() {
                   {/* Store Header bar */}
                   <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
                     <div>
-                      <h1 className="text-xl font-black font-sans tracking-tight text-brand-ink m-0">AL REHAB BUILDING MATERIALS</h1>
+                      <h1 className="text-xl font-black font-sans tracking-tight text-brand-ink m-0">AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)</h1>
                       <div className="text-[11px] text-gray-600 font-sans mt-0.5">
-                        Deira, Dubai, United Arab Emirates (UAE)<br />
-                        Phone: +971 4 223 3445 | Email: billing@alrehab.ae<br />
-                        <strong>TRN: 100234567800003</strong> (Tax Registration Number)
+                        Industrial Area, Al Sajaa, Sharjah, U.A.E.<br />
+                        Phone: +971 52 684 3809 | Email: sales@alzahrabm.com<br />
+                        <strong>TRN: 100259942900003</strong> (Tax Registration Number)
                       </div>
                     </div>
                     <div className="text-right">
@@ -1147,10 +1145,10 @@ export default function Billing() {
                   
                   {/* Store info header */}
                   <div className="text-center flex flex-col items-center border-b border-dashed border-black pb-3 mb-3">
-                    <strong className="text-xs uppercase tracking-tight block">AL REHAB BUILDING MATERIALS</strong>
-                    <span className="text-[9px] block">Deira, Dubai, UAE</span>
+                    <strong className="text-xs uppercase tracking-tight block">AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)</strong>
+                    <span className="text-[9px] block">Industrial Area, Al Sajaa, Sharjah, U.A.E.</span>
                     <span className="text-[9px] block">Phone: +971 4 223 3445</span>
-                    <strong className="text-[9px] block">TRN: 100234567800003</strong>
+                    <strong className="text-[9px] block">TRN: 100259942900003</strong>
                     
                     <strong className="text-xs tracking-widest block uppercase mt-2.5 font-bold">--- TAX INVOICE ---</strong>
                     <span className="text-[9px] text-gray-500">فاتورة ضريبية مبسطة</span>
@@ -1211,7 +1209,7 @@ export default function Billing() {
                   {/* Footer message */}
                   <div className="text-center text-[9px] pt-2 flex flex-col gap-0.5">
                     <span>* Thank You For Visiting *</span>
-                    <span>AL REHAB BUILDING MATERIALS</span>
+                    <span>AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)</span>
                     <span>E-Invoice generated in database</span>
                     <span>sqlite3 ID: {selectedInvoice.id}</span>
                   </div>

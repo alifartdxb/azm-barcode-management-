@@ -220,6 +220,31 @@ export default function PrintLabels() {
       {/* Dynamic Print CSS Style Injection */}
       <style>{`
         @media print {
+          /* Force scrollbar hiding on all elements during print */
+          * {
+            -ms-overflow-style: none !important;
+            scrollbar-width: none !important;
+          }
+          *::-webkit-scrollbar {
+            display: none !important;
+          }
+
+          /* Reset heights and overflows on all layout/ancestor containers to prevent scrollbar rendering and clipping */
+          html, body, #root, main,
+          .flex.h-screen, 
+          .flex-1.flex-col,
+          .flex.flex-col.h-full.bg-brand-bg,
+          .flex.h-full.overflow-hidden,
+          .flex-1.bg-brand-bg.overflow-auto,
+          .print-canvas {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            position: relative !important;
+            background: white !important;
+          }
+
           body {
             background: white !important;
             color: black !important;

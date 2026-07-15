@@ -1086,7 +1086,7 @@ export default function PrintLabels() {
                               style={{ fontSize: `${skuFontSize}pt` }}
                             >
                               <span>SKU: <strong className="text-black">{product.sku}</strong></span>
-                              <span>MFR STICKER</span>
+                              
                             </div>
                           )}
                         </div>
@@ -1196,7 +1196,7 @@ export default function PrintLabels() {
                         style={{ fontSize: `${skuFontSize}pt` }}
                       >
                         <span>SKU: <strong className="text-black">{product.sku}</strong></span>
-                        <span>MFR STICKER</span>
+                        
                       </div>
                     )}
 

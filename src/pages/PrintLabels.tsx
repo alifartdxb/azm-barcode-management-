@@ -27,6 +27,7 @@ interface LabelTemplate {
 
 const TEMPLATES: LabelTemplate[] = [
   // A4 Layouts
+  { id: 'A4-2x8', name: 'A4 Sheet (2 × 8)', mode: 'A4', columns: 2, rows: 8, labelWidth: 75.0, labelHeight: 35.0, columnGap: 0.0, rowGap: 0.0, topMargin: 8.5, leftMargin: 30.0 },
   { id: 'L7159', name: 'A4 - L7159 (3 x 8, 63.5×33.9mm)', mode: 'A4', columns: 3, rows: 8, labelWidth: 63.5, labelHeight: 33.9, columnGap: 2.5, rowGap: 0, topMargin: 12.9, leftMargin: 7.2 },
   { id: 'L7160', name: 'A4 - L7160 (3 x 7, 63.5×38.1mm)', mode: 'A4', columns: 3, rows: 7, labelWidth: 63.5, labelHeight: 38.1, columnGap: 2.5, rowGap: 0, topMargin: 15.1, leftMargin: 7.2 },
   { id: 'L7163', name: 'A4 - L7163 (2 x 7, 99.1×38.1mm)', mode: 'A4', columns: 2, rows: 7, labelWidth: 99.1, labelHeight: 38.1, columnGap: 2.5, rowGap: 0, topMargin: 15.1, leftMargin: 4.7 },
@@ -52,34 +53,56 @@ export default function PrintLabels() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   
-  // Active Template State
-  const [selectedTemplateId, setSelectedTemplateId] = useState('L7160');
-  const [customSpecs, setCustomSpecs] = useState<LabelTemplate>({
-    id: 'custom', name: 'Custom Calibration Template...', mode: 'A4', columns: 3, rows: 8, labelWidth: 63.5, labelHeight: 38.1, columnGap: 2, rowGap: 0, topMargin: 10, leftMargin: 10
+  // Active Template State (with local storage restoration)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(() => {
+    return localStorage.getItem('mfms_label_default_template') || 'A4-2x8';
+  });
+  const [customSpecs, setCustomSpecs] = useState<LabelTemplate>(() => {
+    const saved = localStorage.getItem('mfms_label_custom_specs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return {
+      id: 'custom', name: 'Custom Calibration Template...', mode: 'A4', columns: 3, rows: 8, labelWidth: 63.5, labelHeight: 38.1, columnGap: 2, rowGap: 0, topMargin: 10, leftMargin: 10
+    };
   });
 
   // Current applied template configurations
   const activeTemplate = selectedTemplateId === 'custom' 
     ? customSpecs 
-    : TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[1];
+    : TEMPLATES.find(t => t.id === selectedTemplateId) || TEMPLATES[0];
 
   // Visual Designer options
   const [showGuidelines, setShowGuidelines] = useState(true);
-  const [showHeader, setShowHeader] = useState(true);
+  const [showHeader, setShowHeader] = useState(false);
   const [headerText, setHeaderText] = useState('AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)');
   const [headerFontSize, setHeaderFontSize] = useState(7);
   
   const [showName, setShowName] = useState(true);
   const [nameFontSize, setNameFontSize] = useState(9);
   
-  
-  const [showPrice, setShowPrice] = useState(true);
+  const [showPrice, setShowPrice] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mfms_label_show_price');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [priceFontSize, setPriceFontSize] = useState(11);
   const [priceStyle, setPriceStyle] = useState<'standard' | 'badge' | 'inverse'>('badge');
   const [currency, setCurrency] = useState('AED');
 
   const [showSku, setShowSku] = useState(true);
-  const [skuFontSize, setSkuFontSize] = useState(7);
+  const [skuFontSize, setSkuFontSize] = useState<number>(() => {
+    const saved = localStorage.getItem('mfms_label_sku_font_size');
+    return saved !== null ? parseInt(saved, 10) : 10;
+  });
+
+  const [showBrand, setShowBrand] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mfms_label_show_brand');
+    return saved !== null ? saved === 'true' : true;
+  });
 
   const [showBarcodeText, setShowBarcodeText] = useState(true);
   const [barcodeTextFontSize, setBarcodeTextFontSize] = useState(8);
@@ -92,19 +115,46 @@ export default function PrintLabels() {
   const [labelPadding, setLabelPadding] = useState(2); // internal padding in mm
   
   // Quick batch config
-  const [bulkQty, setBulkQty] = useState('5');
+  const [bulkQty, setBulkQty] = useState<string>(() => {
+    return localStorage.getItem('mfms_label_bulk_qty') || '1';
+  });
   const [activeTab, setActiveTab] = useState<'template' | 'style' | 'items'>('template');
+
+  // Save preferences when state changes
+  useEffect(() => {
+    localStorage.setItem('mfms_label_default_template', selectedTemplateId);
+  }, [selectedTemplateId]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_custom_specs', JSON.stringify(customSpecs));
+  }, [customSpecs]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_show_brand', String(showBrand));
+  }, [showBrand]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_show_price', String(showPrice));
+  }, [showPrice]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_sku_font_size', String(skuFontSize));
+  }, [skuFontSize]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_bulk_qty', bulkQty);
+  }, [bulkQty]);
 
   useEffect(() => {
     ProductService.getAll()
       .then(prods => {
         setProducts(prods);
         
-        // Pre-select first 3 products to show quick previews, and initialize quantities to 5
+        // Pre-select first 3 products to show quick previews, and initialize quantities to 1
         const initialSelected = new Set<number>();
         const initialQtys: Record<number, number> = {};
         prods.forEach((p: Product, i: number) => {
-          initialQtys[p.id!] = 5;
+          initialQtys[p.id!] = 1;
           if (i < 3) {
             initialSelected.add(p.id!);
           }
@@ -134,6 +184,12 @@ export default function PrintLabels() {
       newSet.delete(id);
     } else {
       newSet.add(id);
+      if (!quantities[id]) {
+        setQuantities(prev => ({
+          ...prev,
+          [id]: 1
+        }));
+      }
     }
     setSelectedIds(newSet);
   };
@@ -160,7 +216,12 @@ export default function PrintLabels() {
     if (selectedIds.size === products.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(products.map(p => p.id)));
+      setSelectedIds(new Set(products.map(p => p.id!)));
+      const newQtys = { ...quantities };
+      products.forEach(p => {
+        newQtys[p.id!] = 1;
+      });
+      setQuantities(newQtys);
     }
   };
 
@@ -498,28 +559,19 @@ export default function PrintLabels() {
             {activeTab === 'style' && (
               <div className="flex flex-col gap-3">
                 
-                {/* Store Header configuration */}
-                <div className="bg-white border border-brand-line p-3 flex flex-col gap-2.5">
+                {/* Brand Display Toggle */}
+                <div className="bg-white border border-brand-line p-3 flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase">
+                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase cursor-pointer">
                       <input 
                         type="checkbox"
-                        checked={showHeader}
-                        onChange={(e) => setShowHeader(e.target.checked)}
-                        className="accent-brand-ink"
+                        checked={showBrand}
+                        onChange={(e) => setShowBrand(e.target.checked)}
+                        className="accent-brand-ink cursor-pointer"
                       />
-                      Store Header Text
+                      Show Product Brand
                     </label>
-                    
                   </div>
-                  <input 
-                    type="text"
-                    value={headerText}
-                    disabled={!showHeader}
-                    onChange={(e) => setHeaderText(e.target.value)}
-                    placeholder="e.g. AL Zahra Al Malakia Bldg. Mat. Tr. LLC (Shj. Br.)"
-                    className="w-full border border-brand-line px-2 py-1 text-xs font-bold disabled:bg-gray-100"
-                  />
                 </div>
 
                 {/* Product Name Title Style */}
@@ -592,20 +644,46 @@ export default function PrintLabels() {
                   </div>
                 </div>
 
-                {/* SKU Code Toggles */}
-                <div className="bg-white border border-brand-line p-3 flex flex-col gap-2">
+                {/* SKU Code Toggles & Font Size */}
+                <div className="bg-white border border-brand-line p-3 flex flex-col gap-2.5">
                   <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase">
+                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase cursor-pointer">
                       <input 
                         type="checkbox"
                         checked={showSku}
                         onChange={(e) => setShowSku(e.target.checked)}
-                        className="accent-brand-ink"
+                        className="accent-brand-ink cursor-pointer"
                       />
                       Product SKU
                     </label>
-                    
                   </div>
+                  {showSku && (
+                    <div className="flex flex-col gap-2 border-t border-dashed border-gray-100 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] uppercase text-gray-500 font-bold">SKU Font Size (pt)</span>
+                        <input 
+                          type="number"
+                          min="6"
+                          max="18"
+                          value={skuFontSize}
+                          onChange={(e) => setSkuFontSize(Math.min(18, Math.max(6, parseInt(e.target.value, 10) || 10)))}
+                          className="w-12 border border-brand-line text-center text-xs font-mono p-1"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] text-gray-400 font-mono">6pt</span>
+                        <input 
+                          type="range"
+                          min="6"
+                          max="18"
+                          value={skuFontSize}
+                          onChange={(e) => setSkuFontSize(parseInt(e.target.value, 10))}
+                          className="flex-1 h-4 accent-brand-ink"
+                        />
+                        <span className="text-[8px] text-gray-400 font-mono">18pt</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Barcode Vector Dimensions */}
@@ -710,21 +788,35 @@ export default function PrintLabels() {
                 </div>
 
                 {/* Bulk tools */}
-                <div className="bg-brand-sidebar border border-brand-line p-2.5 flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-1 text-[10px] font-bold">
-                    <span>Set all selected to:</span>
-                    <input 
-                      type="number"
-                      value={bulkQty}
-                      onChange={(e) => setBulkQty(e.target.value)}
-                      className="w-12 border border-brand-line p-1 text-center font-mono text-xs bg-white"
-                    />
+                <div className="bg-brand-sidebar border border-brand-line p-2.5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 text-[10px] font-bold">
+                      <span>Set selected to:</span>
+                      <input 
+                        type="number"
+                        value={bulkQty}
+                        onChange={(e) => setBulkQty(e.target.value)}
+                        className="w-12 border border-brand-line p-1 text-center font-mono text-xs bg-white"
+                      />
+                    </div>
+                    <button 
+                      onClick={applyBulkQty}
+                      className="bg-brand-ink text-white text-[10px] font-bold px-3 py-1 border border-brand-line hover:bg-opacity-90 cursor-pointer uppercase"
+                    >
+                      Apply Qty
+                    </button>
                   </div>
                   <button 
-                    onClick={applyBulkQty}
-                    className="bg-brand-ink text-white text-[10px] font-bold px-3 py-1 border border-brand-line hover:bg-opacity-90 cursor-pointer uppercase"
+                    onClick={() => {
+                      const newQtys = { ...quantities };
+                      selectedIds.forEach(id => {
+                        newQtys[id] = 1;
+                      });
+                      setQuantities(newQtys);
+                    }}
+                    className="w-full bg-white text-brand-ink border border-brand-line hover:bg-gray-50 text-[10px] font-bold py-1 cursor-pointer uppercase text-center"
                   >
-                    Apply Qty
+                    Set All Selected (Qty = 1)
                   </button>
                 </div>
 
@@ -913,16 +1005,6 @@ export default function PrintLabels() {
                             <div className="absolute inset-0 border border-dotted border-blue-200 pointer-events-none print:hidden" style={{ margin: `${labelPadding}mm` }} />
                           )}
 
-                          {/* 1. Header Row */}
-                          {showHeader && (
-                            <div 
-                              className="font-sans font-extrabold uppercase tracking-tight text-center truncate border-b border-gray-200" 
-                              style={{ fontSize: `${headerFontSize}pt`, lineHeight: 1.1 }}
-                            >
-                              {headerText}
-                            </div>
-                          )}
-
                           {/* 2. Middle Block (Titles and Price Tag) */}
                           <div className="flex-1 flex flex-col justify-center my-0.5 min-h-0 overflow-hidden">
                             <div className="flex items-start justify-between gap-1">
@@ -935,6 +1017,11 @@ export default function PrintLabels() {
                                     style={{ fontSize: `${nameFontSize}pt`, lineHeight: 1.1 }}
                                   >
                                     {product.name}
+                                  </div>
+                                )}
+                                {showBrand && (
+                                  <div className="text-[7pt] text-gray-500 font-medium truncate uppercase leading-tight mt-0.5">
+                                    Brand: {product.brand || 'N/A'}
                                   </div>
                                 )}
                               </div>
@@ -994,7 +1081,10 @@ export default function PrintLabels() {
 
                           {/* 4. Footer SKU Indicator */}
                           {showSku && (
-                            <div className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 text-[6pt] font-mono leading-none">
+                            <div 
+                              className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 font-mono leading-none"
+                              style={{ fontSize: `${skuFontSize}pt` }}
+                            >
                               <span>SKU: <strong className="text-black">{product.sku}</strong></span>
                               <span>MFR STICKER</span>
                             </div>
@@ -1025,16 +1115,6 @@ export default function PrintLabels() {
                       </div>
                     )}
 
-                    {/* 1. Header Row */}
-                    {showHeader && (
-                      <div 
-                        className="font-sans font-black uppercase tracking-tight text-center truncate border-b border-gray-300" 
-                        style={{ fontSize: `${headerFontSize}pt`, lineHeight: 1.1 }}
-                      >
-                        {headerText}
-                      </div>
-                    )}
-
                     {/* 2. Middle Block (Titles and Price Tag) */}
                     <div className="flex-1 flex flex-col justify-center my-0.5 min-h-0 overflow-hidden">
                       <div className="flex items-start justify-between gap-1">
@@ -1049,7 +1129,11 @@ export default function PrintLabels() {
                               {product.name}
                             </div>
                           )}
-                          
+                          {showBrand && (
+                            <div className="text-[7pt] text-gray-500 font-medium truncate uppercase leading-tight mt-0.5">
+                              Brand: {product.brand || 'N/A'}
+                            </div>
+                          )}
                         </div>
 
                         {/* Price Tag Column */}
@@ -1107,7 +1191,10 @@ export default function PrintLabels() {
 
                     {/* 4. Footer SKU Indicator */}
                     {showSku && (
-                      <div className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 text-[6pt] font-mono leading-none">
+                      <div 
+                        className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 font-mono leading-none"
+                        style={{ fontSize: `${skuFontSize}pt` }}
+                      >
                         <span>SKU: <strong className="text-black">{product.sku}</strong></span>
                         <span>MFR STICKER</span>
                       </div>

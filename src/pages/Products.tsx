@@ -17,6 +17,14 @@ import { Card, CardContent } from '../components/ui/card';
 import { 
   Table, TableHeader, TableRow, TableHead, TableBody, TableCell 
 } from '../components/ui/table';
+import { normalizeProductName, previewNextSku, previewNextBarcode } from '../utils/localDb';
+
+interface ColumnConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  width?: number;
+}
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,7 +48,38 @@ export default function Products() {
   const [newSupplier, setNewSupplier] = useState('');
   const [newStock, setNewStock] = useState('0');
   const [newBarcode, setNewBarcode] = useState('');
+  
+  // New pricing and warehouse/notes fields
+  const [newPriceCode, setNewPriceCode] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newMinStock, setNewMinStock] = useState('10');
+  const [newWarehouse, setNewWarehouse] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  
+  const [saveAndNewFlag, setSaveAndNewFlag] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Column customization & sorting states
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false);
+  const [sortField, setSortField] = useState<string>('sku');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  
+  const [columns, setColumns] = useState<ColumnConfig[]>([
+    { id: 'sku', label: 'SKU', visible: true, width: 90 },
+    { id: 'barcode', label: 'Barcode', visible: true, width: 150 },
+    { id: 'name', label: 'Product Name', visible: true, width: 230 },
+    { id: 'unit', label: 'Unit', visible: true, width: 80 },
+    { id: 'price_code', label: 'Price Code', visible: true, width: 110 },
+    { id: 'retail_price', label: 'Retail Price (AED)', visible: true, width: 130 },
+    { id: 'cost_price', label: 'Cost Price (AED)', visible: true, width: 130 },
+    { id: 'brand', label: 'Brand', visible: true, width: 100 },
+    { id: 'category', label: 'Category', visible: true, width: 110 },
+    { id: 'supplier', label: 'Supplier', visible: true, width: 130 },
+    { id: 'stock', label: 'Stock', visible: true, width: 85 },
+    { id: 'actions', label: 'Actions', visible: true, width: 100 }
+  ]);
+
+  const unitSelectRef = useRef<HTMLSelectElement>(null);
 
   // CSV Import Wizard state
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
@@ -90,35 +129,119 @@ export default function Products() {
   const isBarcodeDuplicate = newBarcode.trim() !== '' && products.some(p => p.barcode && p.barcode.toLowerCase() === newBarcode.trim().toLowerCase());
   const barcodeValidation = newBarcode ? validateBarcode(newBarcode) : null;
 
-  // Handle manual product submission
+  // Auto-generate SKU/Barcode on open
+  useEffect(() => {
+    if (isAddOpen) {
+      const initSeqs = async () => {
+        try {
+          const nextSku = await previewNextSku();
+          const nextBarcode = await previewNextBarcode();
+          setNewSku(nextSku);
+          setNewBarcode(nextBarcode);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      initSeqs();
+
+      setTimeout(() => {
+        if (unitSelectRef.current) {
+          unitSelectRef.current.focus();
+        }
+      }, 100);
+    }
+  }, [isAddOpen]);
+
+  const handleClearForm = () => {
+    setNewName('');
+    setNewBrand('');
+    setNewCategory('');
+    setNewPrice('0.00');
+    setNewCost('0.00');
+    setNewVat('5.0');
+    setNewSupplier('');
+    setNewStock('0');
+    setNewPriceCode('');
+    setNewImageUrl('');
+    setNewMinStock('10');
+    setNewWarehouse('');
+    setNewNotes('');
+    
+    const resetSeqs = async () => {
+      try {
+        const nextSku = await previewNextSku();
+        const nextBarcode = await previewNextBarcode();
+        setNewSku(nextSku);
+        setNewBarcode(nextBarcode);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    resetSeqs();
+    
+    setTimeout(() => {
+      if (unitSelectRef.current) {
+        unitSelectRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      if (e.currentTarget.tagName.toLowerCase() === 'textarea') return;
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (!form) return;
+      
+      const focusableSelector = 'input:not([disabled]):not([readonly]), select:not([disabled]):not([readonly]), textarea:not([disabled])';
+      const elements = Array.from(form.querySelectorAll(focusableSelector)) as HTMLElement[];
+      const index = elements.indexOf(e.currentTarget);
+      if (index > -1 && index < elements.length - 1) {
+        elements[index + 1].focus();
+      }
+    }
+  };
+
   const handleManualAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!newSku.trim() || !newName.trim()) {
+    const cleanSku = newSku.trim();
+    const cleanName = newName.trim();
+    const cleanBarcode = newBarcode.trim();
+
+    if (!cleanSku || !cleanName) {
       setFormError('SKU and Product Name are required fields.');
       return;
     }
 
     if (isSkuDuplicate) {
-      setFormError(`SKU '${newSku}' is already assigned to a product.`);
+      setFormError(`SKU '${cleanSku}' is already assigned to a product.`);
       return;
     }
 
     if (isBarcodeDuplicate) {
-      setFormError(`Barcode '${newBarcode}' is already assigned to a product.`);
+      setFormError(`Barcode '${cleanBarcode}' is already assigned to a product.`);
       return;
     }
 
-    if (newBarcode && barcodeValidation && !barcodeValidation.isValid) {
-      setFormError(`Barcode format warning: ${barcodeValidation.errorMessage}`);
+    if (cleanBarcode && barcodeValidation && !barcodeValidation.isValid) {
+      setFormError(`Barcode format issue: ${barcodeValidation.errorMessage}`);
+      return;
+    }
+
+    // Duplicate Product Name validation (case-insensitive, space-agnostic)
+    const normName = normalizeProductName(cleanName);
+    const hasNameDuplicate = products.some(p => normalizeProductName(p.name) === normName);
+    if (hasNameDuplicate) {
+      setFormError(`Product already exists.`);
       return;
     }
 
     const payload = {
-      sku: newSku.trim(),
-      barcode: newBarcode.trim(),
-      name: newName.trim(),
+      sku: cleanSku,
+      barcode: cleanBarcode,
+      name: cleanName,
       brand: newBrand.trim(),
       category: newCategory.trim(),
       unit: newUnit,
@@ -127,58 +250,90 @@ export default function Products() {
       vat: parseFloat(newVat) || 0,
       supplier: newSupplier.trim(),
       stock_quantity: parseInt(newStock, 10) || 0,
+      price_code: newPriceCode.trim(),
+      image_url: newImageUrl.trim(),
+      minimum_stock: parseInt(newMinStock, 10) || 10,
+      warehouse_location: newWarehouse.trim(),
+      notes: newNotes.trim()
     };
 
     try {
-      const data = await ProductService.save(payload);
+      const saved = await ProductService.save(payload);
       setMessage({ 
         type: 'success', 
-        text: `Product '${newName}' created successfully! (Barcode: ${data.barcode})` 
+        text: `Product '${cleanName}' created successfully!` 
       });
-      setIsAddOpen(false);
-      // Reset form
-      setNewSku('');
-      setNewName('');
-      setNewBrand('');
-      setNewCategory('');
-      setNewPrice('0.00');
-      setNewCost('0.00');
-      setNewVat('5.0');
-      setNewSupplier('');
-      setNewStock('0');
-      setNewBarcode('');
       fetchProducts();
+
+      if (saveAndNewFlag) {
+        // Reset inputs, keeping drawer open
+        setNewName('');
+        setNewBrand('');
+        setNewCategory('');
+        setNewPrice('0.00');
+        setNewCost('0.00');
+        setNewVat('5.0');
+        setNewSupplier('');
+        setNewStock('0');
+        setNewPriceCode('');
+        setNewImageUrl('');
+        setNewMinStock('10');
+        setNewWarehouse('');
+        setNewNotes('');
+        
+        // Auto generate next SKU and Barcode for high-speed entry flow
+        const nextSku = await previewNextSku();
+        const nextBarcode = await previewNextBarcode();
+        setNewSku(nextSku);
+        setNewBarcode(nextBarcode);
+
+        // Reset focus
+        setTimeout(() => {
+          if (unitSelectRef.current) {
+            unitSelectRef.current.focus();
+          }
+        }, 100);
+      } else {
+        setIsAddOpen(false);
+        // Clear all
+        setNewSku('');
+        setNewName('');
+        setNewBrand('');
+        setNewCategory('');
+        setNewPrice('0.00');
+        setNewCost('0.00');
+        setNewVat('5.0');
+        setNewSupplier('');
+        setNewStock('0');
+        setNewBarcode('');
+        setNewPriceCode('');
+        setNewImageUrl('');
+        setNewMinStock('10');
+        setNewWarehouse('');
+        setNewNotes('');
+      }
     } catch (err: any) {
       setFormError(err.message);
     }
   };
 
-
-  // Generate local barcode for manual entry form
-  const triggerFormBarcodeGen = () => {
-    const existingCodes = products.map(p => p.barcode || '').filter(Boolean);
-    const generated = generateLocalEan13(existingCodes);
-    setNewBarcode(generated);
-  };
-
   const handleExportCSV = () => {
-    if (filteredProducts.length === 0) {
-      alert("No inventory data to export matching current filter.");
+    if (products.length === 0) {
+      alert("No inventory data to export.");
       return;
     }
-    // Prepare clean data for CSV export
-    const cleanData = filteredProducts.map(({ id, ...p }) => ({
+    const cleanData = products.map((p) => ({
       SKU: p.sku,
       Barcode: p.barcode || '',
-      Name: p.name,
+      'Product Name': p.name,
+      Unit: p.unit || 'pcs',
+      'Price Code': p.price_code || '',
+      'Retail Price': p.selling_price,
+      'Cost Price': p.cost_price,
       Brand: p.brand || '',
       Category: p.category || '',
-      Unit: p.unit || 'pcs',
-      'Selling Price (AED)': p.selling_price,
-      'Cost Price (AED)': p.cost_price,
-      'VAT (%)': p.vat,
       Supplier: p.supplier || '',
-      'Stock Quantity': p.stock_quantity,
+      Stock: p.stock_quantity,
     }));
 
     const csv = Papa.unparse(cleanData);
@@ -193,23 +348,22 @@ export default function Products() {
   };
 
   const handleExportExcel = () => {
-    if (filteredProducts.length === 0) {
-      alert("No inventory data to export matching current filter.");
+    if (products.length === 0) {
+      alert("No inventory data to export.");
       return;
     }
-    // Prepare clean data for Excel export
-    const cleanData = filteredProducts.map(({ id, ...p }) => ({
+    const cleanData = products.map((p) => ({
       SKU: p.sku,
       Barcode: p.barcode || '',
-      Name: p.name,
+      'Product Name': p.name,
+      Unit: p.unit || 'pcs',
+      'Price Code': p.price_code || '',
+      'Retail Price': p.selling_price,
+      'Cost Price': p.cost_price,
       Brand: p.brand || '',
       Category: p.category || '',
-      Unit: p.unit || 'pcs',
-      'Selling Price (AED)': p.selling_price,
-      'Cost Price (AED)': p.cost_price,
-      'VAT (%)': p.vat,
       Supplier: p.supplier || '',
-      'Stock Quantity': p.stock_quantity,
+      Stock: p.stock_quantity,
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
@@ -233,6 +387,7 @@ export default function Products() {
       { field: 'VAT (%)', keys: ['vat', 'VAT', 'VAT (%)'] },
       { field: 'Stock Level', keys: ['stock_quantity', 'Stock', 'Quantity', 'Stock Quantity'] },
       { field: 'Supplier', keys: ['supplier', 'Supplier'] },
+      { field: 'Price Code', keys: ['price_code', 'Price Code', 'PriceCode', 'priceCode'] },
     ];
 
     detectedHeaders.forEach(header => {
@@ -251,9 +406,11 @@ export default function Products() {
 
     const fileSkus = new Set<string>();
     const fileBarcodes = new Set<string>();
+    const fileNames = new Set<string>();
 
     const dbSkuMap = new Set(products.map(p => p.sku.toLowerCase()));
     const dbBarcodeMap = new Set(products.map(p => p.barcode ? p.barcode.toLowerCase() : '').filter(Boolean));
+    const dbNamesSet = new Set(products.map(p => normalizeProductName(p.name)));
 
     const errorsList: {row: number, sku: string, name: string, message: string, severity: 'error' | 'warning'}[] = [];
     const validRows: any[] = [];
@@ -273,16 +430,46 @@ export default function Products() {
 
       let hasRowErr = false;
 
-      // 1. Validate SKU
-      if (!cleanSku) {
+      // 1. Validate Product Name
+      if (!cleanName || cleanName.toLowerCase() === 'unknown product') {
         errorsList.push({
           row: rowNum,
-          sku: 'BLANK',
-          name: cleanName || 'Unknown Product',
-          message: 'Missing SKU: Product must have a unique identifier.',
+          sku: cleanSku || 'N/A',
+          name: 'MISSING',
+          message: 'Missing Product Name: Product title is a required field.',
           severity: 'error'
         });
         hasRowErr = true;
+      } else {
+        const normName = normalizeProductName(cleanName);
+        
+        // If Product Name already exists (case-insensitive, space-agnostic), reject and include in report
+        const isUpdateOfSameSku = cleanSku && dbSkuMap.has(cleanSku.toLowerCase()) && 
+                                  products.find(x => x.sku.toLowerCase() === cleanSku.toLowerCase())?.name.toLowerCase().trim() === cleanName.toLowerCase().trim();
+
+        if ((dbNamesSet.has(normName) || fileNames.has(normName)) && !isUpdateOfSameSku) {
+          errorsList.push({
+            row: rowNum,
+            sku: cleanSku || 'N/A',
+            name: cleanName,
+            message: 'Product already exists.',
+            severity: 'error'
+          });
+          hasRowErr = true;
+        } else {
+          fileNames.add(normName);
+        }
+      }
+
+      // 2. Validate SKU
+      if (!cleanSku) {
+        errorsList.push({
+          row: rowNum,
+          sku: 'AUTO-GEN',
+          name: cleanName,
+          message: 'Missing SKU: System will auto-generate an auto-incrementing SKU code.',
+          severity: 'warning'
+        });
       } else {
         const lowerSku = cleanSku.toLowerCase();
         if (fileSkus.has(lowerSku)) {
@@ -310,18 +497,6 @@ export default function Products() {
         }
       }
 
-      // 2. Validate Product Name
-      if (!cleanName || cleanName.toLowerCase() === 'unknown product') {
-        errorsList.push({
-          row: rowNum,
-          sku: cleanSku || 'N/A',
-          name: 'MISSING',
-          message: 'Missing Product Name: Product title is a required field.',
-          severity: 'error'
-        });
-        hasRowErr = true;
-      }
-
       // 3. Validate Barcode
       if (!cleanBarcode) {
         blankBarcodes++;
@@ -329,7 +504,7 @@ export default function Products() {
           row: rowNum,
           sku: cleanSku || 'N/A',
           name: cleanName,
-          message: 'Missing Barcode: System will auto-generate an EAN-13 barcode on import.',
+          message: 'Missing Barcode: System will auto-generate an EAN-style barcode on import.',
           severity: 'warning'
         });
       } else {
@@ -358,16 +533,18 @@ export default function Products() {
           }
         }
 
-        // Validate barcode format
-        const valRes = validateBarcode(cleanBarcode);
-        if (!valRes.isValid) {
-          errorsList.push({
-            row: rowNum,
-            sku: cleanSku || 'N/A',
-            name: cleanName,
-            message: `Barcode format issue: ${valRes.errorMessage}`,
-            severity: 'warning'
-          });
+        // Validate barcode format if present and not a standard generated template
+        if (!cleanBarcode.startsWith('AZM-5253')) {
+          const valRes = validateBarcode(cleanBarcode);
+          if (!valRes.isValid) {
+            errorsList.push({
+              row: rowNum,
+              sku: cleanSku || 'N/A',
+              name: cleanName,
+              message: `Barcode format issue: ${valRes.errorMessage}`,
+              severity: 'warning'
+            });
+          }
         }
       }
 
@@ -465,6 +642,7 @@ export default function Products() {
               vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
               stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
+              price_code: getVal(row.price_code || row.priceCode || row['Price Code'] || row.PriceCode || row.Price_Code || ''),
             };
           });
 
@@ -499,6 +677,7 @@ export default function Products() {
               vat: parseFloat(row.vat || row.VAT || row['VAT (%)'] || row.vatRate || '0') || 0,
               supplier: getVal(row.supplier || row.Supplier || ''),
               stock_quantity: parseInt(row.stock_quantity || row.Stock || row.Quantity || row['Stock Quantity'] || row.stock || '0', 10) || 0,
+              price_code: getVal(row.price_code || row.priceCode || row['Price Code'] || row.PriceCode || row.Price_Code || ''),
             };
           });
 
@@ -628,11 +807,111 @@ export default function Products() {
   };
 
 
-  const filteredProducts = products.filter(p => 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const moveColumn = (index: number, direction: 'left' | 'right') => {
+    const newCols = [...columns];
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex >= 0 && targetIndex < newCols.length) {
+      const temp = newCols[index];
+      newCols[index] = newCols[targetIndex];
+      newCols[targetIndex] = temp;
+      setColumns(newCols);
+    }
+  };
+
+  const [resizingColIndex, setResizingColIndex] = useState<number | null>(null);
+  const [resizeStartX, setResizeStartX] = useState<number>(0);
+  const [resizeStartWidth, setResizeStartWidth] = useState<number>(0);
+
+  const startResize = (index: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingColIndex(index);
+    setResizeStartX(e.clientX);
+    setResizeStartWidth(columns[index].width || 100);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (resizingColIndex !== null) {
+        const deltaX = e.clientX - resizeStartX;
+        const newWidth = Math.max(50, resizeStartWidth + deltaX);
+        setColumns(cols => cols.map((col, idx) => 
+          idx === resizingColIndex ? { ...col, width: newWidth } : col
+        ));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setResizingColIndex(null);
+    };
+
+    if (resizingColIndex !== null) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingColIndex, resizeStartX, resizeStartWidth]);
+
+  const sortedAndFilteredProducts = React.useMemo(() => {
+    let result = products.filter(p => {
+      const query = searchTerm.toLowerCase();
+      return (
+        p.sku.toLowerCase().includes(query) ||
+        p.name.toLowerCase().includes(query) ||
+        (p.barcode && p.barcode.toLowerCase().includes(query)) ||
+        (p.price_code && p.price_code.toLowerCase().includes(query)) ||
+        (p.brand && p.brand.toLowerCase().includes(query)) ||
+        (p.category && p.category.toLowerCase().includes(query)) ||
+        (p.supplier && p.supplier.toLowerCase().includes(query))
+      );
+    });
+
+    if (sortField) {
+      result.sort((a: any, b: any) => {
+        let valA = a[sortField];
+        let valB = b[sortField];
+
+        if (sortField === 'retail_price') {
+          valA = a.selling_price || 0;
+          valB = b.selling_price || 0;
+        } else if (sortField === 'cost_price') {
+          valA = a.cost_price || 0;
+          valB = b.cost_price || 0;
+        } else if (sortField === 'stock') {
+          valA = a.stock_quantity || 0;
+          valB = b.stock_quantity || 0;
+        }
+
+        if (typeof valA === 'string') {
+          valA = valA.toLowerCase();
+          valB = (valB || '').toLowerCase();
+        }
+
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [products, searchTerm, sortField, sortDirection]);
+
+  const handleDeleteProduct = async (id: number, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete product '${name}'?`)) {
+      try {
+        await ProductService.delete(id);
+        setMessage({ type: 'success', text: `Product '${name}' deleted successfully.` });
+        fetchProducts();
+      } catch (err: any) {
+        setMessage({ type: 'error', text: 'Failed to delete product: ' + err.message });
+      }
+    }
+  };
 
   return (
     <div 
@@ -766,94 +1045,234 @@ export default function Products() {
         </div>
       )}
 
+      {/* Column Visibility and Configuration Panel */}
+      <div className="mx-6 mt-4 p-4 rounded-lg border bg-card/50 flex flex-wrap gap-2 items-center text-xs shrink-0">
+        <span className="font-semibold text-muted-foreground mr-2">Toggle Visible Columns:</span>
+        {columns.map((col, idx) => (
+          <button
+            key={col.id}
+            onClick={() => {
+              setColumns(columns.map((c) => c.id === col.id ? { ...c, visible: !c.visible } : c));
+            }}
+            className={`px-2 py-1 rounded border font-medium flex items-center gap-1 transition-all ${
+              col.visible 
+                ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20' 
+                : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+            }`}
+          >
+            {col.visible ? '✓' : '✗'} {col.label}
+          </button>
+        ))}
+      </div>
+
       {/* Product List Table Layout */}
       <div className="flex-1 overflow-auto p-6">
-        <Card>
-          <div className="px-6 py-4 border-b flex justify-between items-center bg-card">
+        <Card className="min-w-full overflow-hidden">
+          <div className="px-6 py-4 border-b flex justify-between items-center bg-card shrink-0">
             <h3 className="font-semibold text-lg">Product Explorer Database</h3>
-            <Badge variant="outline" className="font-normal text-muted-foreground">Showing {filteredProducts.length} items</Badge>
+            <Badge variant="outline" className="font-normal text-muted-foreground">
+              Showing {sortedAndFilteredProducts.length} of {products.length} items
+            </Badge>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">SKU</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="w-[180px]">Barcode & Validation</TableHead>
-                <TableHead className="text-right w-[120px]">Price</TableHead>
-                <TableHead className="text-right w-[100px]">Stock</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+          <div className="overflow-x-auto w-full">
+            <Table style={{ tableLayout: 'fixed', width: '100%' }}>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <RefreshCw className="w-6 h-6 animate-spin" />
-                      <span>Fetching secure SQLite index...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredProducts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                      <AlertTriangle className="w-10 h-10 text-yellow-500" />
-                      <span className="font-medium text-foreground">No records on file</span>
-                      <span className="text-sm">Import a CSV spreadsheet or click "Add Product" to get started.</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredProducts.map(p => {
-                  const val = p.barcode ? validateBarcode(p.barcode) : null;
-                  return (
-                    <TableRow key={p.id} className="cursor-pointer transition-colors hover:bg-muted/50">
-                      <TableCell className="font-medium font-mono text-xs">{p.sku}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{p.name}</span>
-                          
+                  {columns.filter(col => col.visible).map((col, colIdx) => {
+                    const isSorted = sortField === col.id;
+                    return (
+                      <TableHead 
+                        key={col.id} 
+                        style={{ width: `${col.width || 120}px` }} 
+                        className="relative group select-none py-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span 
+                            onClick={() => {
+                              if (sortField === col.id) {
+                                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                              } else {
+                                setSortField(col.id);
+                                setSortDirection('asc');
+                              }
+                            }}
+                            className="cursor-pointer font-semibold hover:text-primary flex items-center gap-1 shrink-0"
+                          >
+                            {col.label}
+                            {isSorted && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                          </span>
+
+                          {/* Reordering indicators */}
+                          <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 ml-2 transition-opacity duration-200">
+                            {colIdx > 0 && (
+                              <button 
+                                onClick={() => moveColumn(columns.indexOf(col), 'left')} 
+                                title="Move Column Left"
+                                className="p-0.5 bg-muted rounded hover:bg-primary/20 text-[10px]"
+                              >
+                                ◀
+                              </button>
+                            )}
+                            {colIdx < columns.filter(c => c.visible).length - 1 && (
+                              <button 
+                                onClick={() => moveColumn(columns.indexOf(col), 'right')} 
+                                title="Move Column Right"
+                                className="p-0.5 bg-muted rounded hover:bg-primary/20 text-[10px]"
+                              >
+                                ▶
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{p.category || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {p.barcode ? (
-                            <>
-                              <span className="font-mono text-xs font-medium">{p.barcode}</span>
-                              {val && val.isValid ? (
-                                <Badge variant="success" className="text-[10px] px-1.5 py-0 uppercase w-fit scale-90 -ml-1">
-                                  {val.type} ✓
-                                </Badge>
-                              ) : (
-                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase w-fit scale-90 -ml-1" title={val?.errorMessage}>
-                                  INVALID
-                                </Badge>
-                              )}
-                            </>
-                          ) : (
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">
-                              Missing Barcode
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium text-sm">
-                        {formatCurrency(p.selling_price)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={p.stock_quantity > 10 ? 'success' : 'destructive'} className="font-mono text-xs">
-                          {p.stock_quantity}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+
+                        {/* Draggable resize handler handles */}
+                        <div 
+                          onMouseDown={(e) => startResize(columns.indexOf(col), e)}
+                          className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-primary/40 z-10 transition-colors"
+                        />
+                      </TableHead>
+                    );
+                  })}
+                  <TableHead className="w-[100px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-64 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <RefreshCw className="w-6 h-6 animate-spin" />
+                        <span>Fetching secure SQLite index...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : sortedAndFilteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.filter(c => c.visible).length + 1} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                        <AlertTriangle className="w-10 h-10 text-yellow-500" />
+                        <span className="font-medium text-foreground">No records match the query</span>
+                        <span className="text-sm">Adjust filters, import a CSV, or click "Add Product".</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedAndFilteredProducts.map(p => {
+                    const barcodeVal = p.barcode ? validateBarcode(p.barcode) : null;
+                    return (
+                      <TableRow key={p.id} className="cursor-pointer transition-colors hover:bg-muted/50">
+                        {columns.filter(col => col.visible).map((col) => {
+                          switch (col.id) {
+                            case 'sku':
+                              return (
+                                <TableCell key={col.id} className="font-medium font-mono text-xs overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.sku}
+                                </TableCell>
+                              );
+                            case 'barcode':
+                              return (
+                                <TableCell key={col.id} className="overflow-hidden text-ellipsis whitespace-nowrap">
+                                  <div className="flex flex-col gap-0.5">
+                                    {p.barcode ? (
+                                      <>
+                                        <span className="font-mono text-xs font-medium">{p.barcode}</span>
+                                        {barcodeVal && barcodeVal.isValid ? (
+                                          <Badge variant="success" className="text-[9px] px-1 py-0 uppercase w-fit scale-90 -ml-1">
+                                            {barcodeVal.type} ✓
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="destructive" className="text-[9px] px-1 py-0 uppercase w-fit scale-90 -ml-1" title={barcodeVal?.errorMessage}>
+                                            INVALID
+                                          </Badge>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[9px] px-1 py-0 uppercase w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">
+                                        Missing
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              );
+                            case 'name':
+                              return (
+                                <TableCell key={col.id} className="font-medium overflow-hidden text-ellipsis whitespace-nowrap" title={p.name}>
+                                  {p.name}
+                                </TableCell>
+                              );
+                            case 'unit':
+                              return (
+                                <TableCell key={col.id} className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.unit || 'pcs'}
+                                </TableCell>
+                              );
+                            case 'price_code':
+                              return (
+                                <TableCell key={col.id} className="font-mono font-medium text-xs text-primary overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.price_code || '-'}
+                                </TableCell>
+                              );
+                            case 'retail_price':
+                              return (
+                                <TableCell key={col.id} className="font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {formatCurrency(p.selling_price)}
+                                </TableCell>
+                              );
+                            case 'cost_price':
+                              return (
+                                <TableCell key={col.id} className="font-mono text-sm text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {formatCurrency(p.cost_price)}
+                                </TableCell>
+                              );
+                            case 'brand':
+                              return (
+                                <TableCell key={col.id} className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.brand || '-'}
+                                </TableCell>
+                              );
+                            case 'category':
+                              return (
+                                <TableCell key={col.id} className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.category || '-'}
+                                </TableCell>
+                              );
+                            case 'supplier':
+                              return (
+                                <TableCell key={col.id} className="text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                                  {p.supplier || '-'}
+                                </TableCell>
+                              );
+                            case 'stock':
+                              const isLow = p.stock_quantity <= (p.minimum_stock || 10);
+                              return (
+                                <TableCell key={col.id} className="font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+                                  <Badge variant={isLow ? 'destructive' : 'success'} className="font-mono text-xs">
+                                    {p.stock_quantity} {isLow && '⚠️'}
+                                  </Badge>
+                                </TableCell>
+                              );
+                            default:
+                              return <TableCell key={col.id}>-</TableCell>;
+                          }
+                        })}
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10" 
+                            onClick={(e) => handleDeleteProduct(p.id!, p.name, e)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </div>
 
@@ -869,7 +1288,7 @@ export default function Products() {
               </Button>
             </div>
 
-          <form onSubmit={handleManualAddSubmit} className="flex-1 overflow-auto p-6 flex flex-col gap-5">
+          <form onSubmit={handleManualAddSubmit} className="flex-1 overflow-auto p-6 flex flex-col gap-6">
             {formError && (
               <div className="bg-red-50 text-red-900 border-red-200 border p-3 rounded-md text-sm font-medium flex gap-2 items-start dark:bg-red-900/30 dark:text-red-100 dark:border-red-900">
                 <ShieldAlert className="w-5 h-5 shrink-0" />
@@ -877,26 +1296,24 @@ export default function Products() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">SKU Code <span className="text-red-500">*</span></label>
-                <Input 
-                  type="text" 
-                  value={newSku}
-                  onChange={(e) => setNewSku(e.target.value)}
-                  placeholder="e.g. AZ-4022"
-                  className={`font-mono ${isSkuDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                  required
-                />
-                {isSkuDuplicate && <p className="text-red-500 text-xs mt-1">SKU already registered</p>}
+            {/* 1. Identification Group */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">1. Identification</span>
               </div>
-              
+
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Unit Type</label>
+                <label className="text-sm font-medium flex items-center justify-between">
+                  <span>Unit Type <span className="text-red-500">*</span></span>
+                  <span className="text-[10px] text-muted-foreground italic">(Autofocused first)</span>
+                </label>
                 <select 
+                  ref={unitSelectRef}
                   value={newUnit}
                   onChange={(e) => setNewUnit(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  required
                 >
                   <option value="pcs">Pcs (Each)</option>
                   <option value="box">Box</option>
@@ -905,156 +1322,303 @@ export default function Products() {
                   <option value="set">Set</option>
                 </select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Product Name <span className="text-red-500">*</span></label>
+                <Input 
+                  type="text" 
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="e.g. Arabescato Vagli Marble Slab"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">SKU Code (Auto-Generated)</label>
+                  <Input 
+                    type="text" 
+                    value={newSku}
+                    onChange={(e) => setNewSku(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Auto-generating..."
+                    className={`font-mono ${isSkuDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                    required
+                  />
+                  {isSkuDuplicate && <p className="text-red-500 text-xs mt-1">SKU already registered</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Brand / Manufacturer</label>
+                  <Input 
+                    type="text" 
+                    value={newBrand}
+                    onChange={(e) => setNewBrand(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Antolini"
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-md p-3.5 bg-muted/30 space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Barcode Identification</label>
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const existingCodes = products.map(p => p.barcode || '').filter(Boolean);
+                      const generated = generateLocalEan13(existingCodes);
+                      setNewBarcode(generated);
+                    }}
+                    className="h-7 text-xs flex items-center gap-1.5"
+                  >
+                    <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                    Auto-Generate
+                  </Button>
+                </div>
+                
+                <Input 
+                  type="text" 
+                  value={newBarcode}
+                  onChange={(e) => setNewBarcode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Leave blank to auto-generate"
+                  className={`font-mono ${isBarcodeDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                />
+
+                {isBarcodeDuplicate && (
+                  <p className="text-red-500 text-xs">Duplicate: Barcode already exists in DB!</p>
+                )}
+
+                {newBarcode && barcodeValidation && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {barcodeValidation.isValid ? (
+                      <span className="text-green-600 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Valid {barcodeValidation.type}
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 font-medium flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Warning: {barcodeValidation.errorMessage}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Product Name <span className="text-red-500">*</span></label>
-              <Input 
-                type="text" 
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Stainless Steel Screws 4mm"
-                required
+            {/* 2. Pricing Group */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">2. Pricing</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Price Code</label>
+                  <Input 
+                    type="text" 
+                    value={newPriceCode}
+                    onChange={(e) => setNewPriceCode(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. GR-01"
+                    className="font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">VAT (%)</label>
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    value={newVat}
+                    onChange={(e) => setNewVat(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Retail Price (AED)</label>
+                  <Input 
+                    type="number" 
+                    step="0.01"
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="font-mono"
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Cost Price (AED)</label>
+                  <Input 
+                    type="number" 
+                    step="0.01"
+                    value={newCost}
+                    onChange={(e) => setNewCost(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Classification Group */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">3. Classification</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Category</label>
+                  <Input 
+                    type="text" 
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Granite slabs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Supplier Account</label>
+                  <Input 
+                    type="text" 
+                    value={newSupplier}
+                    onChange={(e) => setNewSupplier(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Carrara Quarry Corp"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Inventory Group */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">4. Inventory & Warehouse</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Stock Qty</label>
+                  <Input 
+                    type="number" 
+                    value={newStock}
+                    onChange={(e) => setNewStock(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Min Stock</label>
+                  <Input 
+                    type="number" 
+                    value={newMinStock}
+                    onChange={(e) => setNewMinStock(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Location</label>
+                  <Input 
+                    type="text" 
+                    value={newWarehouse}
+                    onChange={(e) => setNewWarehouse(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Row-4B"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Additional Information Group */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b">
+                <span className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">5. Additional Specifications</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Product Image URL</label>
+                <Input 
+                  type="url" 
+                  value={newImageUrl}
+                  onChange={(e) => setNewImageUrl(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Notes / Custom Specs</label>
+                <textarea 
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Thickness, polished status, quality grade specifications..."
+                  className="w-full flex min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
+            </div>
+
+            {/* High speed data entry checkbox (Save & New) */}
+            <div className="flex items-start gap-2.5 p-3 rounded-lg border bg-muted/20">
+              <input 
+                id="saveAndNewCheckbox"
+                type="checkbox" 
+                checked={saveAndNewFlag}
+                onChange={(e) => setSaveAndNewFlag(e.target.checked)}
+                className="rounded border-input text-primary focus:ring-ring h-4 w-4 mt-0.5"
               />
+              <div className="grid gap-1.5 leading-none">
+                <label 
+                  htmlFor="saveAndNewCheckbox"
+                  className="text-xs font-semibold leading-none cursor-pointer select-none"
+                >
+                  Save & New (Continuous Entry)
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  Keeps the sidebar open and automatically updates the next SKU/Barcode sequence for high-speed catalog creation.
+                </p>
+              </div>
             </div>
 
-            
-
-            <div className="border rounded-md p-4 bg-muted/30 space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium">Barcode (System/Custom)</label>
+            {/* Action buttons */}
+            <div className="pt-4 flex flex-col gap-2 mt-auto border-t shrink-0">
+              <div className="flex gap-2">
                 <Button 
                   type="button" 
                   variant="outline"
-                  size="sm"
-                  onClick={triggerFormBarcodeGen}
-                  className="h-7 text-xs flex items-center gap-1.5"
+                  className="flex-1"
+                  onClick={handleClearForm}
+                  title="Clear all fields and reset SKU / Barcode auto counters"
                 >
-                  <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                  Auto-Generate
+                  Clear Form
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost"
+                  className="flex-1 border"
+                  onClick={() => setIsAddOpen(false)}
+                >
+                  Cancel
                 </Button>
               </div>
-              
-              <Input 
-                type="text" 
-                value={newBarcode}
-                onChange={(e) => setNewBarcode(e.target.value)}
-                placeholder="Leave blank to auto-generate"
-                className={`font-mono ${isBarcodeDuplicate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-              />
-
-              {isBarcodeDuplicate && (
-                <p className="text-red-500 text-xs">Duplicate: Barcode already exists in DB!</p>
-              )}
-
-              {newBarcode && barcodeValidation && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  {barcodeValidation.isValid ? (
-                    <span className="text-green-600 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Valid {barcodeValidation.type}
-                    </span>
-                  ) : (
-                    <span className="text-amber-600 font-medium flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Format Warning: {barcodeValidation.errorMessage}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Retail Price (AED)</label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-              
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Cost Price (AED)</label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={newCost}
-                  onChange={(e) => setNewCost(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">VAT (%)</label>
-                <Input 
-                  type="number" 
-                  step="0.1"
-                  value={newVat}
-                  onChange={(e) => setNewVat(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Category</label>
-                <Input 
-                  type="text" 
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  placeholder="e.g. Fasteners"
-                />
-              </div>
-              
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Stock Level</label>
-                <Input 
-                  type="number" 
-                  value={newStock}
-                  onChange={(e) => setNewStock(e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Brand / Mfr</label>
-                <Input 
-                  type="text" 
-                  value={newBrand}
-                  onChange={(e) => setNewBrand(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Supplier Account</label>
-                <Input 
-                  type="text" 
-                  value={newSupplier}
-                  onChange={(e) => setNewSupplier(e.target.value)}
-                />
-              </div>
-            </div>
-
-            
-
-            <div className="mt-auto pt-4 flex gap-3 border-t">
-              <Button 
-                type="button" 
-                variant="outline"
-                className="flex-1"
-                onClick={() => setIsAddOpen(false)}
-              >
-                Cancel
-              </Button>
               <Button 
                 type="submit" 
-                className="flex-1"
+                className="w-full font-semibold"
               >
-                Save Product
+                Save & Register Product
               </Button>
             </div>
           </form>

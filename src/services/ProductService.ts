@@ -18,7 +18,11 @@ export class ProductService {
     return db.products.filter(p => 
       p.sku.toLowerCase().includes(lowerQuery) || 
       (p.barcode || '').toLowerCase().includes(lowerQuery) || 
-      p.name.toLowerCase().includes(lowerQuery)
+      p.name.toLowerCase().includes(lowerQuery) ||
+      (p.price_code || '').toLowerCase().includes(lowerQuery) ||
+      (p.brand || '').toLowerCase().includes(lowerQuery) ||
+      (p.category || '').toLowerCase().includes(lowerQuery) ||
+      (p.supplier || '').toLowerCase().includes(lowerQuery)
     ).toArray();
   }
 

@@ -14,6 +14,8 @@ export interface Product {
   minimum_stock?: number;
   stock_quantity: number;
   image_url?: string;
+  price_code?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -148,6 +150,8 @@ export interface AppSettings {
   default_vat: number;
   label_size: string; // e.g., '38x21', '50x25'
   theme: string;
+  last_sku_seq?: number;
+  last_barcode_seq?: number;
 }
 
 export interface DashboardStats {

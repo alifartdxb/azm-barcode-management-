@@ -6,6 +6,54 @@ export async function localGetProducts(): Promise<Product[]> {
   return db.products.toArray();
 }
 
+export function normalizeProductName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+export async function previewNextSku(): Promise<string> {
+  const settingObj = await db.settings.get(1);
+  let nextSeq = 1;
+  if (settingObj && settingObj.last_sku_seq !== undefined) {
+    nextSeq = settingObj.last_sku_seq + 1;
+  } else {
+    const allProds = await db.products.toArray();
+    let maxSeq = 0;
+    allProds.forEach(p => {
+      const val = parseInt(p.sku, 10);
+      if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+    });
+    nextSeq = maxSeq + 1;
+  }
+  return String(nextSeq).padStart(4, '0');
+}
+
+export async function previewNextBarcode(): Promise<string> {
+  const settingObj = await db.settings.get(1);
+  let nextSeq = 1;
+  if (settingObj && settingObj.last_barcode_seq !== undefined) {
+    nextSeq = settingObj.last_barcode_seq + 1;
+  } else {
+    const allProds = await db.products.toArray();
+    let maxSeq = 0;
+    allProds.forEach(p => {
+      if (p.barcode && p.barcode.startsWith('AZM-5253')) {
+        const suffix = p.barcode.replace('AZM-5253', '');
+        const val = parseInt(suffix, 10);
+        if (!isNaN(val) && val > maxSeq) {
+          maxSeq = val;
+        }
+      }
+    });
+    nextSeq = maxSeq + 1;
+  }
+  return `AZM-5253${String(nextSeq).padStart(5, '0')}`;
+}
+
 export async function localSaveProduct(product: any): Promise<Product> {
   // Clean fields
   const cleanProduct = {
@@ -15,16 +63,50 @@ export async function localSaveProduct(product: any): Promise<Product> {
     name: product.name.trim(),
   };
 
-  // Check unique constraints
+  // Check unique constraints: SKU
   const existingSku = await db.products.where('sku').equals(cleanProduct.sku).first();
   if (existingSku && existingSku.id !== cleanProduct.id) {
     throw new Error(`Duplicate SKU: '${cleanProduct.sku}' is already assigned.`);
   }
 
+  // Check unique constraints: Barcode
   if (cleanProduct.barcode) {
     const existingBarcode = await db.products.where('barcode').equals(cleanProduct.barcode).first();
     if (existingBarcode && existingBarcode.id !== cleanProduct.id) {
       throw new Error(`Duplicate Barcode: '${cleanProduct.barcode}' is already in use.`);
+    }
+  }
+
+  // Check unique constraints: Product Name
+  const normName = normalizeProductName(cleanProduct.name);
+  const existingName = await db.products.filter(p => normalizeProductName(p.name) === normName).first();
+  if (existingName && existingName.id !== cleanProduct.id) {
+    throw new Error(`Product already exists.`);
+  }
+
+  // Update setting sequences if necessary
+  const skuAsInt = parseInt(cleanProduct.sku, 10);
+  if (!isNaN(skuAsInt)) {
+    const settingObj = await db.settings.get(1);
+    if (settingObj) {
+      const currentSeq = settingObj.last_sku_seq || 0;
+      if (skuAsInt > currentSeq) {
+        await db.settings.update(1, { last_sku_seq: skuAsInt });
+      }
+    }
+  }
+
+  if (cleanProduct.barcode && cleanProduct.barcode.startsWith('AZM-5253')) {
+    const suffix = cleanProduct.barcode.replace('AZM-5253', '');
+    const barcodeAsInt = parseInt(suffix, 10);
+    if (!isNaN(barcodeAsInt)) {
+      const settingObj = await db.settings.get(1);
+      if (settingObj) {
+        const currentSeq = settingObj.last_barcode_seq || 0;
+        if (barcodeAsInt > currentSeq) {
+          await db.settings.update(1, { last_barcode_seq: barcodeAsInt });
+        }
+      }
     }
   }
 
@@ -56,64 +138,98 @@ export async function localBulkImportProducts(
   let generatedCount = 0;
   let skippedList: any[] = [];
 
-  const getEan13CheckDigit = (code12: string): string => {
-    let sum = 0;
-    for (let i = 0; i < 12; i++) {
-      const val = parseInt(code12[i], 10);
-      sum += (i % 2 === 0) ? val : val * 3;
-    }
-    return ((10 - (sum % 10)) % 10).toString();
-  };
-
-  // Bulk import is complex, wrap in a transaction
-  await db.transaction('rw', db.products, async () => {
+  // Bulk import wrapping in transaction
+  await db.transaction('rw', db.products, db.settings, async () => {
     const allDbProducts = await db.products.toArray();
     const dbSkusMap = new Map<string, Product>(allDbProducts.map(p => [p.sku.toLowerCase(), p]));
     const activeBarcodesRegistry = new Set<string>(allDbProducts.map(p => p.barcode).filter(Boolean));
+    const activeNamesRegistry = new Set<string>(allDbProducts.map(p => normalizeProductName(p.name)));
     
     const payloadSkus = new Set<string>();
     const payloadBarcodes = new Set<string>();
-    
-    const generateUniqueLocalBarcode = (): string => {
-      let attempt = 0;
-      while (attempt < 1000) {
-        const random9 = Math.floor(100000000 + Math.random() * 900000000).toString();
-        const code12 = '201' + random9;
-        const barcode = code12 + getEan13CheckDigit(code12);
-        if (!activeBarcodesRegistry.has(barcode)) {
-          return barcode;
+    const payloadNames = new Set<string>();
+
+    const settingObj = await db.settings.get(1);
+    let nextSkuSeq = 1;
+    if (settingObj && settingObj.last_sku_seq !== undefined) {
+      nextSkuSeq = settingObj.last_sku_seq;
+    } else {
+      let maxSku = 0;
+      allDbProducts.forEach(p => {
+        const val = parseInt(p.sku, 10);
+        if (!isNaN(val) && val > maxSku) maxSku = val;
+      });
+      nextSkuSeq = maxSku;
+    }
+
+    let nextBarcodeSeq = 1;
+    if (settingObj && settingObj.last_barcode_seq !== undefined) {
+      nextBarcodeSeq = settingObj.last_barcode_seq;
+    } else {
+      let maxBar = 0;
+      allDbProducts.forEach(p => {
+        if (p.barcode && p.barcode.startsWith('AZM-5253')) {
+          const suffix = p.barcode.replace('AZM-5253', '');
+          const val = parseInt(suffix, 10);
+          if (!isNaN(val) && val > maxBar) maxBar = val;
         }
-        attempt++;
-      }
-      return '201' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
-    };
+      });
+      nextBarcodeSeq = maxBar;
+    }
 
     const toPut: Product[] = [];
 
     for (const p of productsList) {
-      const skuKey = p.sku ? String(p.sku).trim() : '';
-      if (!skuKey) {
-        skippedList.push({ sku: '', name: p.name, reason: 'Missing SKU value' });
+      const nameKey = p.name ? String(p.name).trim() : '';
+      if (!nameKey) {
+        skippedList.push({ sku: p.sku || '', name: 'BLANK', reason: 'Missing Product Name' });
         skippedCount++;
         continue;
       }
 
+      const normName = normalizeProductName(nameKey);
+
+      // Unique product name validation across import payload and DB
+      const existingWithSameName = allDbProducts.find(x => normalizeProductName(x.name) === normName);
+      const cleanSku = p.sku ? String(p.sku).trim() : '';
+      const isUpdateOfSameProduct = existingWithSameName && cleanSku && existingWithSameName.sku.toLowerCase() === cleanSku.toLowerCase();
+
+      if ((activeNamesRegistry.has(normName) || payloadNames.has(normName)) && !isUpdateOfSameProduct) {
+        skippedList.push({ sku: cleanSku, name: nameKey, reason: 'Product already exists.' });
+        skippedCount++;
+        continue;
+      }
+      payloadNames.add(normName);
+
+      // SKU handling
+      let skuKey = cleanSku;
+      if (!skuKey) {
+        nextSkuSeq++;
+        skuKey = String(nextSkuSeq).padStart(4, '0');
+        generatedCount++;
+      }
+
       if (payloadSkus.has(skuKey.toLowerCase())) {
-        skippedList.push({ sku: skuKey, name: p.name, reason: `Duplicate SKU '${skuKey}' within import file` });
+        skippedList.push({ sku: skuKey, name: nameKey, reason: `Duplicate SKU '${skuKey}' within import file` });
         skippedCount++;
         continue;
       }
       payloadSkus.add(skuKey.toLowerCase());
 
+      // Barcode handling
       let barcode = p.barcode ? String(p.barcode).trim() : '';
-      if (barcode) {
-        if (payloadBarcodes.has(barcode.toLowerCase())) {
-          skippedList.push({ sku: skuKey, name: p.name, reason: `Duplicate Barcode '${barcode}' within import file` });
-          skippedCount++;
-          continue;
-        }
-        payloadBarcodes.add(barcode.toLowerCase());
+      if (!barcode) {
+        nextBarcodeSeq++;
+        barcode = `AZM-5253${String(nextBarcodeSeq).padStart(5, '0')}`;
+        generatedCount++;
       }
+
+      if (payloadBarcodes.has(barcode.toLowerCase())) {
+        skippedList.push({ sku: skuKey, name: nameKey, reason: `Duplicate Barcode '${barcode}' within import file` });
+        skippedCount++;
+        continue;
+      }
+      payloadBarcodes.add(barcode.toLowerCase());
 
       const existingItem = dbSkusMap.get(skuKey.toLowerCase());
 
@@ -121,13 +237,13 @@ export async function localBulkImportProducts(
       
       if (existingItem) {
         if (!overwrite) {
-          skippedList.push({ sku: skuKey, name: p.name, reason: `SKU '${skuKey}' already exists (overwrite disabled)` });
+          skippedList.push({ sku: skuKey, name: nameKey, reason: `SKU '${skuKey}' already exists (overwrite disabled)` });
           skippedCount++;
           continue;
         }
         finalProduct = {
           ...existingItem,
-          name: p.name ? String(p.name).trim() : existingItem.name,
+          name: nameKey,
           brand: p.brand !== undefined ? String(p.brand).trim() : existingItem.brand,
           category: p.category !== undefined ? String(p.category).trim() : existingItem.category,
           unit: p.unit !== undefined ? String(p.unit).trim() : existingItem.unit,
@@ -136,12 +252,13 @@ export async function localBulkImportProducts(
           vat: p.vat !== undefined ? parseFloat(p.vat) || 0 : existingItem.vat,
           supplier: p.supplier !== undefined ? String(p.supplier).trim() : existingItem.supplier,
           stock_quantity: p.stock_quantity !== undefined ? parseInt(p.stock_quantity, 10) || 0 : existingItem.stock_quantity,
+          price_code: p.price_code !== undefined ? String(p.price_code).trim() : existingItem.price_code,
         };
       } else {
         finalProduct = {
           sku: skuKey,
           barcode: barcode,
-          name: p.name ? String(p.name).trim() : 'Unknown Product',
+          name: nameKey,
           brand: p.brand ? String(p.brand).trim() : '',
           category: p.category ? String(p.category).trim() : '',
           unit: p.unit ? String(p.unit).trim() : 'pcs',
@@ -150,42 +267,25 @@ export async function localBulkImportProducts(
           vat: parseFloat(p.vat) || 0,
           supplier: p.supplier ? String(p.supplier).trim() : '',
           stock_quantity: parseInt(p.stock_quantity, 10) || 0,
+          price_code: p.price_code ? String(p.price_code).trim() : '',
         };
       }
 
-      // Generate barcode if empty
-      if (!finalProduct.barcode) {
+      const isOwnBarcode = existingItem && existingItem.barcode === finalProduct.barcode;
+      if (!isOwnBarcode && activeBarcodesRegistry.has(finalProduct.barcode!)) {
         if (autoGenerateMissing) {
-          const newBar = generateUniqueLocalBarcode();
+          nextBarcodeSeq++;
+          const newBar = `AZM-5253${String(nextBarcodeSeq).padStart(5, '0')}`;
           finalProduct.barcode = newBar;
           activeBarcodesRegistry.add(newBar);
           generatedCount++;
         } else {
-          // Check if SKU is valid for Code128
-          const cleanSku = finalProduct.sku!.replace(/[^ -~]/g, '');
-          if (cleanSku && !activeBarcodesRegistry.has(cleanSku)) {
-            finalProduct.barcode = cleanSku;
-            activeBarcodesRegistry.add(cleanSku);
-          } else {
-            finalProduct.barcode = '';
-          }
+          skippedList.push({ sku: skuKey, name: nameKey, reason: `Barcode '${finalProduct.barcode}' is already in use` });
+          skippedCount++;
+          continue;
         }
       } else {
-        const isOwnBarcode = existingItem && existingItem.barcode === finalProduct.barcode;
-        if (!isOwnBarcode && activeBarcodesRegistry.has(finalProduct.barcode)) {
-          if (autoGenerateMissing) {
-            const newBar = generateUniqueLocalBarcode();
-            finalProduct.barcode = newBar;
-            activeBarcodesRegistry.add(newBar);
-            generatedCount++;
-          } else {
-            skippedList.push({ sku: skuKey, name: p.name, reason: `Barcode '${finalProduct.barcode}' is already in use` });
-            skippedCount++;
-            continue;
-          }
-        } else {
-          activeBarcodesRegistry.add(finalProduct.barcode);
-        }
+        activeBarcodesRegistry.add(finalProduct.barcode!);
       }
 
       if (existingItem) updatedCount++; else insertedCount++;
@@ -194,6 +294,13 @@ export async function localBulkImportProducts(
     
     // Dexie bulk put
     await db.products.bulkPut(toPut);
+
+    // Save final updated sequences to settings table
+    if (settingObj) {
+      await db.settings.update(1, { last_sku_seq: nextSkuSeq, last_barcode_seq: nextBarcodeSeq });
+    } else {
+      await db.settings.add({ id: 1, last_sku_seq: nextSkuSeq, last_barcode_seq: nextBarcodeSeq } as any);
+    }
   });
 
   return {

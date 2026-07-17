@@ -99,6 +99,15 @@ export default function PrintLabels() {
     return saved !== null ? parseInt(saved, 10) : 10;
   });
 
+  const [showPriceCode, setShowPriceCode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('mfms_label_show_price_code');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [priceCodeFontSize, setPriceCodeFontSize] = useState<number>(() => {
+    const saved = localStorage.getItem('mfms_label_price_code_font_size');
+    return saved !== null ? parseInt(saved, 10) : 10;
+  });
+
   const [showBrand, setShowBrand] = useState<boolean>(() => {
     const saved = localStorage.getItem('mfms_label_show_brand');
     return saved !== null ? saved === 'true' : true;
@@ -140,6 +149,14 @@ export default function PrintLabels() {
   useEffect(() => {
     localStorage.setItem('mfms_label_sku_font_size', String(skuFontSize));
   }, [skuFontSize]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_show_price_code', String(showPriceCode));
+  }, [showPriceCode]);
+
+  useEffect(() => {
+    localStorage.setItem('mfms_label_price_code_font_size', String(priceCodeFontSize));
+  }, [priceCodeFontSize]);
 
   useEffect(() => {
     localStorage.setItem('mfms_label_bulk_qty', bulkQty);
@@ -686,6 +703,48 @@ export default function PrintLabels() {
                   )}
                 </div>
 
+                {/* Price Code Toggles & Font Size */}
+                <div className="bg-white border border-brand-line p-3 flex flex-col gap-2.5">
+                  <div className="flex justify-between items-center">
+                    <label className="flex items-center gap-1.5 font-bold text-[10px] uppercase cursor-pointer">
+                      <input 
+                        type="checkbox"
+                        checked={showPriceCode}
+                        onChange={(e) => setShowPriceCode(e.target.checked)}
+                        className="accent-brand-ink cursor-pointer"
+                      />
+                      Price Code (Bottom-Right)
+                    </label>
+                  </div>
+                  {showPriceCode && (
+                    <div className="flex flex-col gap-2 border-t border-dashed border-gray-100 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] uppercase text-gray-500 font-bold">Price Code Font Size (pt)</span>
+                        <input 
+                          type="number"
+                          min="6"
+                          max="18"
+                          value={priceCodeFontSize}
+                          onChange={(e) => setPriceCodeFontSize(Math.min(18, Math.max(6, parseInt(e.target.value, 10) || 10)))}
+                          className="w-12 border border-brand-line text-center text-xs font-mono p-1"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] text-gray-400 font-mono">6pt</span>
+                        <input 
+                          type="range"
+                          min="6"
+                          max="18"
+                          value={priceCodeFontSize}
+                          onChange={(e) => setPriceCodeFontSize(parseInt(e.target.value, 10))}
+                          className="flex-1 h-4 accent-brand-ink"
+                        />
+                        <span className="text-[8px] text-gray-400 font-mono">18pt</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Barcode Vector Dimensions */}
                 <div className="bg-white border border-brand-line p-3 flex flex-col gap-2.5">
                   <span className="font-bold text-[10px] uppercase block">Barcode Layout Parameters</span>
@@ -1079,14 +1138,25 @@ export default function PrintLabels() {
                             )}
                           </div>
 
-                          {/* 4. Footer SKU Indicator */}
-                          {showSku && (
+                          {/* 4. Footer SKU & Price Code Indicators */}
+                          {(showSku || (showPriceCode && product.price_code)) && (
                             <div 
                               className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 font-mono leading-none"
-                              style={{ fontSize: `${skuFontSize}pt` }}
                             >
-                              <span>SKU: <strong className="text-black">{product.sku}</strong></span>
-                              
+                              <div>
+                                {showPriceCode && product.price_code && (
+                                  <span style={{ fontSize: `${priceCodeFontSize}pt` }} className="text-gray-400">
+                                    CODE: <strong className="text-black">{product.price_code}</strong>
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                {showSku && (
+                                  <span style={{ fontSize: `${skuFontSize}pt` }} className="text-gray-400">
+                                    SKU: <strong className="text-black">{product.sku}</strong>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1189,14 +1259,25 @@ export default function PrintLabels() {
                       )}
                     </div>
 
-                    {/* 4. Footer SKU Indicator */}
-                    {showSku && (
+                    {/* 4. Footer SKU & Price Code Indicators */}
+                    {(showSku || (showPriceCode && product.price_code)) && (
                       <div 
                         className="flex justify-between items-center text-gray-400 mt-0.5 border-t border-dashed border-gray-100 pt-0.5 font-mono leading-none"
-                        style={{ fontSize: `${skuFontSize}pt` }}
                       >
-                        <span>SKU: <strong className="text-black">{product.sku}</strong></span>
-                        
+                        <div>
+                          {showPriceCode && product.price_code && (
+                            <span style={{ fontSize: `${priceCodeFontSize}pt` }} className="text-gray-400">
+                              CODE: <strong className="text-black">{product.price_code}</strong>
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          {showSku && (
+                            <span style={{ fontSize: `${skuFontSize}pt` }} className="text-gray-400">
+                              SKU: <strong className="text-black">{product.sku}</strong>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
 

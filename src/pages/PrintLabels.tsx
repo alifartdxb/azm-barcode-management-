@@ -1146,7 +1146,7 @@ export default function PrintLabels() {
                               <div>
                                 {showPriceCode && product.price_code && (
                                   <span style={{ fontSize: `${priceCodeFontSize}pt` }} className="text-gray-400">
-                                    CODE: <strong className="text-black">{product.price_code}</strong>
+                                    <strong className="text-black">{product.price_code}</strong>
                                   </span>
                                 )}
                               </div>

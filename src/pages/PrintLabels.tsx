@@ -1041,7 +1041,7 @@ export default function PrintLabels() {
                               boxSizing: 'border-box'
                             }}
                           >
-                            {showGuidelines && <span>[Empty Slot]</span>}
+                            {showGuidelines && <span></span>}
                           </div>
                         );
                       }
